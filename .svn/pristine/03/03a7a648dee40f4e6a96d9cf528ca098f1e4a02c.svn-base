@@ -1,0 +1,34 @@
+server:
+  context-path: /s-report
+  port: 8081
+spring:
+  datasource:
+    driver-class-name: oracle.jdbc.driver.OracleDriver
+    url: jdbc:oracle:thin:@127.0.0.1:1521/orcl
+    #url: jdbc:oracle:thin:@127.0.0.1:1521/orcl
+    username: wlzb
+    password: wlzb
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    database-platform: org.hibernate.dialect.OracleDialect
+  session:
+    store-type: none
+  http:
+    multipart:
+      enabled: true
+      max-file-size: 10Mb
+      max-request-size: 50Mb
+      file-size-threshold: 0
+        
+#mybatis
+mybatis:
+  type-aliases-package: net.greatsfot.core.domain.mapper
+  mapper-locations:
+    - classpath*:mapper/*Mapper.xml
+  config-location: classpath:/MyBatis-conf.xml    
+#上传文件夹
+file.path.temp: D:\\file\\temp
+file.path.formal: D:\\file\\formal
+  

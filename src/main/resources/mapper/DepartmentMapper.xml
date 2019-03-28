@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.DepartmentMapper">
+	<!-- 根据参数查询单位树信息 -->
+	<select id="findDepartmentTree" parameterType="java.util.Map" resultType="net.greatsoft.core.dto.budget.DepartmentDto">
+		SELECT 
+			d.DEPARTMENT_ID AS departmentId,
+			d.DEPARTMENT_NAME AS departmentName,
+			d.DEPARTMENT_CHARGER AS departmentCharger,
+			d.DIRECTOR AS director,
+			d.CONTACT_WAY AS cdntactWay,
+			d.IS_CANCEL AS isCancel,
+			d.DEPARTMENT_NO AS departmentNo,
+			d.PARENT_ID AS parentId,
+			d.DEPARTMENT_TYPE AS departmentType
+		FROM 
+			(SELECT DEPARTMENT.*
+			FROM DEPARTMENT
+			START WITH DEPARTMENT.DEPARTMENT_ID = #{departmentId}
+			CONNECT BY NOCYCLE PRIOR DEPARTMENT.DEPARTMENT_ID = PARENT_ID) d
+	</select>
+	<!-- 查询所有单位信息 -->
+	<select id="findAllDepartments" parameterType="java.util.Map" resultType="net.greatsoft.core.dto.budget.DepartmentDto">
+		SELECT 
+			d.DEPARTMENT_ID AS departmentId,
+			d.DEPARTMENT_NAME AS departmentName,
+			d.DEPARTMENT_CHARGER AS departmentCharger,
+			d.DIRECTOR AS director,
+			d.CONTACT_WAY AS cdntactWay,
+			d.IS_CANCEL AS isCancel,
+			d.DEPARTMENT_NO AS departmentNo,
+			d.PARENT_ID AS parentId,
+			d.DEPARTMENT_TYPE AS departmentType,
+			d.ISLEAFNODE AS isLeafNode,
+			d.DEPARTMENT_LEVEL AS departmentLevel,
+			d.SERIAL_NUMBER AS serialNumber
+		FROM 
+			DEPARTMENT d
+		WHERE
+			d.IS_CANCEL = 0
+		<if test="departmentType != null and departmentType !=''">
+		AND
+			d.DEPARTMENT_TYPE in (0, #{departmentType})
+		</if>
+		ORDER BY d.SERIAL_NUMBER
+	</select>
+</mapper>

@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.UserMapper">
+	<resultMap id="userResultMap" type="net.greatsoft.core.domain.model.system.User">
+		<id property="id" column="USERS_ID" jdbcType="VARCHAR" />
+		<result property="name" column="USER_NAME" jdbcType="VARCHAR" />
+		<result property="code" column="USER_CODE" jdbcType="VARCHAR" />
+		<result property="password" column="PASSWORD" jdbcType="VARCHAR" />
+		<result property="passwordSalt" column="PASSWORD_SALT" jdbcType="VARCHAR" />
+		<result property="realName" column="REAL_NAME" jdbcType="VARCHAR" />
+		<result property="no" column="USER_NO" jdbcType="VARCHAR" />
+		<result property="sex" column="SEX" jdbcType="NUMERIC" />
+		<result property="nation" column="NATION" jdbcType="VARCHAR" />
+		<result property="nativePlace" column="NATIVE_PLACE" jdbcType="VARCHAR" />
+		<result property="birthdate" column="BIRTHDAY" jdbcType="DATE" />
+		<result property="idNo" column="IDNO" jdbcType="VARCHAR" />
+		<result property="address" column="ADDRESS" jdbcType="VARCHAR" />
+		<result property="postcode" column="POSTCODE" jdbcType="VARCHAR" />
+		<result property="description" column="USER_DESCRIBE" jdbcType="VARCHAR" />
+		<result property="post" column="POST" jdbcType="VARCHAR" />
+		<result property="tel" column="TEL" jdbcType="VARCHAR" />
+		<result property="mobilePhone" column="MOBILE_PHONE" jdbcType="VARCHAR" />
+		<result property="email" column="EMAIL" jdbcType="VARCHAR" />
+		<result property="securityLevel" column="SECURITY_LEVEL" jdbcType="VARCHAR" />
+		<result property="adminOrganizationId" column="ADMIN_ORG_ID" jdbcType="VARCHAR" />
+		<result property="type" column="USER_TYPE" jdbcType="NUMERIC" />
+		<result property="isValid" column="IS_VALID" jdbcType="NUMERIC" />
+		<result property="isCancel" column="IS_CANCEL" jdbcType="NUMERIC" />
+		<result property="createUserId" column="CREATE_USERS" jdbcType="VARCHAR" />
+		<result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP" />
+		<result property="updateUserId" column="UPDATE_USERS" jdbcType="VARCHAR" />
+		<result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<!-- 查询所有的用户 -->
+	<select id="findAllUsers" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.User">
+		select
+		t.users_id AS usersId,
+		t.department_id AS departmentId,
+		t.department_Name AS departmentName,
+		t.user_name AS userName,
+		t.password AS password,
+		t.real_name AS realName,
+		t.post AS post,
+		t.tel AS tel,
+		t.mobile_phone AS mobilePhone,
+		t.email AS email,
+		t.security_level AS securityLevel,
+		t.user_no AS userNo,
+		t.is_valid AS isValid,
+		t.is_cancel AS isCancel,
+		t.user_type AS userType
+		from USERS t where t.user_type != 5
+		<if test="realName !=null and realName != ''">
+			and t.real_name = #{realName,jdbcType=VARCHAR}
+		</if>
+		<if test="departmentId !=null and departmentId != ''">
+			and t.department_Id = #{departmentId,jdbcType=VARCHAR}
+		</if>
+	</select>
+	<select id="findByUsers" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.User">
+		select
+		t.USERS_ID AS usersId,
+		t.DEPARTMENT_ID AS departmentId,
+		t.USER_NAME AS userName,
+		t.PASSWORD AS password,
+		t.REAL_NAME AS realName,
+		t.POST AS post,
+		t.TEL AS tel,
+		t.MOBILE_PHONE AS mobilePhone,
+		t.EMAIL AS email,
+		t.SECURITY_LEVEL AS securityLevel,
+		t.USER_NO AS userNo,
+		t.IS_VALID AS isValid,
+		t.IS_CANCEL AS isCancel,
+		t.USER_TYPE AS userType
+		from USERS t where 1=1
+		<if test="userName !=null">
+			and t.user_name = #{userName,jdbcType=VARCHAR}
+		</if>
+		<if test="departmentId !=null">
+			and t.department_id = #{departmentId,jdbcType=VARCHAR}
+		</if>
+	</select>
+	<select id="getUserListByCondition" parameterType="hashmap" resultType="net.greatsoft.core.domain.model.system.User">
+		select 
+			t.USERS_ID AS usersId,
+			t.DEPARTMENT_ID AS departmentId,
+			t.USER_NAME AS userName,
+			t.PASSWORD AS password,
+			t.REAL_NAME AS realName,
+			t.POST AS post,
+			t.TEL AS tel,
+			t.MOBILE_PHONE AS mobilePhone,
+			t.EMAIL AS email,
+			t.SECURITY_LEVEL AS securityLevel,
+			t.USER_NO AS userNo,
+			t.IS_VALID AS isValid,
+			t.IS_CANCEL AS isCancel,
+			t.USER_TYPE AS userType
+		  from users t
+		 inner join users_role ur
+		    on t.users_id = ur.users_id
+		 inner join role r
+		    on ur.role_id = r.role_id
+		 <!-- where t.admin_org_id --> 
+		 <where>
+		 	<if test="orgId != null and orgId != ''">
+		 		and t.admin_org_id = #{orgId}
+		 	</if>
+		 	<if test="roleId != null and roleId != ''">
+		        and r.role_id = #{roleId}
+		    </if>
+		 </where>		
+		 <!-- in
+		       (select o.org_id
+		          from org o
+		         start with o.org_id = #{orgId}
+		                and o.org_status = '0'
+		        connect by prior o.org_unique_id = o.org_subjectionpid) -->
+	</select>
+	<sql id="user_allColumnList">
+		USERS_ID, USER_NAME, USER_CODE, PASSWORD, PASSWORD_SALT,
+		REAL_NAME, USER_NO, SEX, NATION, NATIVE_PLACE,
+		BIRTHDAY, IDNO, ADDRESS, POSTCODE, USER_DESCRIBE,
+		POST, TEL, MOBILE_PHONE, EMAIL, SECURITY_LEVEL,
+		ADMIN_ORG_ID, USER_TYPE, IS_VALID, IS_CANCEL, CREATE_USERS,
+		CREATE_TIME, UPDATE_USERS, UPDATE_TIME
+	</sql>
+	<!-- 查询所有的用户 -->
+	<select id="searchUser" parameterType="map" resultMap="userResultMap">
+		SELECT <include refid="user_allColumnList" />
+		  FROM USERS
+		 WHERE IS_CANCEL = 0
+		<if test="name != null and name != ''">
+		   AND USER_NAME like '%'|| #{name,jdbcType=VARCHAR} ||'%'
+		</if>
+		<if test="realName != null and realName != ''">
+		   AND REAL_NAME like '%'|| #{realName,jdbcType=VARCHAR} ||'%'
+		</if>
+		<if test="adminOrganizationId != null and adminOrganizationId != ''">
+		   AND ADMIN_ORG_ID = #{adminOrganizationId,jdbcType=VARCHAR}
+		</if>
+		<if test="isValid != null">
+		   AND IS_VALID = #{isValid,jdbcType=NUMERIC}
+		</if>
+		<if test="roleId != null and roleId != ''">
+		   AND USERS_ID IN (SELECT USERS_ID FROM USERS_ROLE WHERE ROLE_ID = #{roleId,jdbcType=VARCHAR})
+		</if>
+		<if test="orgList != null and orgList.size > 0">
+			and admin_org_id in 
+			<foreach item="item" index = "index" collection="orgList" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+		<!-- 如果登录用户是超级管理员,那么返回其下所有的用户,如果不是就返回当前机构的用户 -->
+		<choose>
+			<when test="admin != null and admin != ''">
+				and admin_org_id in (
+				select  t.org_unique_id from org t start with t.org_unique_id = #{pid}  and t.org_status = '0'
+					connect by prior org_unique_id = org_subjectionpid
+				)
+			</when>
+			<when test="pid != null and pid != ''">
+				and admin_org_id = #{pid}
+			</when>
+		</choose>
+			
+	</select>
+	<!-- 查询指定机构下的所有的用户信息 (人员配置)-->
+	<select  id="getAllocationTree" parameterType="map" resultMap="userResultMap">
+		select <include refid="user_allColumnList" />
+		from users t  where t.admin_org_id  = #{orgId}
+		<if test="isValid != null">
+			and t.IS_VALID = #{isValid} 
+		</if>
+		<if test="isCancel != null">
+			and t.IS_CANCEL = #{isCancel} 
+		</if>
+	</select>
+	<!-- 查询任务分配人员信息 -->
+	<select  id="getAllocationList" parameterType="map" resultMap="userResultMap">
+		<!-- select <include refid="user_allColumnList" />
+		from users t  where  t.admin_org_id = #{orgId} 
+		and t.users_id in (select tu.tu_userid  from task_user tu where tu.tu_taskid= #{taskId}) -->
+		select <include refid="user_allColumnList" />
+		from users t inner join task_user tu 
+		on t.users_id = tu.tu_userid
+		where tu.tu_taskid= #{taskId}
+	</select>
+
+	<!--删除所有用户数据-->
+	<delete id="deleteAllUsersInfo">
+		delete from users where user_name != 'admin'
+	</delete>
+
+	<!--查询开放注册平台用户数据-->
+	<select id="findOpenRegistryUsers" resultType="net.greatsoft.core.domain.model.system.User">
+		select
+		 USERS_INFO_ID       as id,
+		 USERS_NAME		as name,<!--账户名称-->
+		<!--as code,--><!--系统代码-->
+		<!--as password,--><!--密码-->
+		<!--as passwordSalt,--><!-- 密码盐-->
+		USERS_NAME		as realName,<!-- 用户真实姓名 -->
+		USERS_CODE		as no,<!--编号 -->
+		to_number(trim(SEX))		as sex,<!-- 用户性别 1:男 2：女-->
+		NATIONAL		as nation,<!-- 用户民族 -->
+		<!--as nativePlace,--><!-- 籍贯 -->
+		BIRTH_DATE		as birthdate,<!-- 出生日期 -->
+		ID_CARD		as idNo, <!-- 身份证号 -->
+		ADDRESS		as address,<!-- 住址 -->
+		<!--as postcode,--><!-- 邮编 -->
+		REMARKS		as description,<!-- 描述 -->
+		JOB_POST_CODE		as post,<!-- 岗位 -->
+		OFFICE_PHONE		as tel,<!-- 电话 -->
+		PHONE		as mobilePhone,<!-- 移动电话 -->
+		EMAIL		as email,<!-- 电子邮件 -->
+		<!--as securityLevel,--><!-- 安全级别 -->
+		ORG_ID	as adminOrganizationId,<!-- 注册管理单位id -->
+		'9'		as type,<!--  1:管理员，9：普通用户 -->
+		decode(IS_DELETED, 1, '0', 0, '1')	as isValid,<!--  是否启用 1:启用 0:停用-->
+		'0'		as isCancel,<!-- 是否删除 1:是 0 否 -->
+		CREATOR_ID		as createUserId,<!-- 创建人id -->
+		CREATE_TIME		as createTime,<!-- 创建时间-->
+		MODIFIER_ID		as updateUserId,<!-- 修改人 -->
+		MODIFIED_TIME		as updateTime, <!-- 修改时间 -->
+		case
+			when USERS_TYPE = '2' then '3'
+			when USERS_TYPE = '3' then '5'
+		else '3' end  roleId  <!--基层填报用户角色信息-->
+			from
+				USERS_INFO@openRegistry
+		where USERS_TYPE in ('2', '3')
+		and APPROVE_STATUS = '2'
+	</select>
+
+	<!---->
+	<insert id="insertOpenUsersInfo">
+		insert into users(USERS_ID, USER_NAME, PASSWORD, PASSWORD_SALT, REAL_NAME, USER_NO,
+		SEX, NATION, BIRTHDAY, IDNO, ADDRESS, USER_DESCRIBE,
+		POST, TEL, MOBILE_PHONE, EMAIL, ADMIN_ORG_ID,
+		USER_TYPE, IS_VALID, IS_CANCEL, CREATE_USERS, CREATE_TIME,
+		UPDATE_USERS, UPDATE_TIME
+		)
+		select
+		USERS_INFO_ID,
+		PHONE,
+		'9711d33bdf119a4e85b2b64d5df9abdc',
+		'123456',
+		USERS_NAME,
+		USERS_CODE,
+		to_number(trim(SEX)),
+		NATIONAL,
+		BIRTH_DATE,
+		ID_CARD,
+		ADDRESS,
+		REMARKS,
+		JOB_POST_CODE,
+		OFFICE_PHONE,
+		PHONE,
+		EMAIL,
+		ORG_ID,
+		'9',
+		decode(IS_DELETED, 1, '0', 0, '1'),
+		'0',
+		CREATOR_ID,
+		CREATE_TIME,
+		MODIFIER_ID,
+		MODIFIED_TIME
+		from
+		USERS_INFO@openRegistry
+		where USERS_TYPE in ('2', '3')
+		and APPROVE_STATUS = '2'
+
+	</insert>
+
+	<!--批量导入开放注册平台-->
+	<insert id="insertBatchUsersInfo" useGeneratedKeys="false" parameterType="java.util.List">
+			insert all
+			<foreach collection="list" item="usersInfo" index="index" >
+				into users_info
+				(USERS_ID,USER_NAME,REAL_NAME,
+				USER_NO,SEX,NATION,BIRTHDAY,IDNO,ADDRESS,USER_DESCRIBE,
+				POST,TEL,MOBILE_PHONE,EMAIL,ADMIN_ORG_ID,USER_TYPE,IS_VALID,
+				IS_CANCEL,CREATE_USERS,CREATE_TIME,UPDATE_USERS,UPDATE_TIME)
+				values(
+				#{usersInfo.id,jdbcType=VARCHAR},#{usersInfo.name,jdbcType=VARCHAR},
+				#{usersInfo.realName,jdbcType=VARCHAR},#{usersInfo.no,jdbcType=VARCHAR},
+				#{usersInfo.sex,jdbcType=DOUBLE},
+				#{usersInfo.nation,jdbcType=VARCHAR},#{usersInfo.birthdate,jdbcType=DATE},
+				#{usersInfo.idNo,jdbcType=VARCHAR},
+				#{usersInfo.address,jdbcType=VARCHAR},#{usersInfo.description,jdbcType=VARCHAR},
+				#{usersInfo.post,jdbcType=VARCHAR},
+				#{usersInfo.tel,jdbcType=VARCHAR},#{usersInfo.mobilePhone,jdbcType=VARCHAR},
+				#{usersInfo.email,jdbcType=VARCHAR},
+				#{usersInfo.adminOrganizationId,jdbcType=VARCHAR},#{usersInfo.type,jdbcType=VARCHAR},
+				#{usersInfo.isValid,jdbcType=VARCHAR},#{usersInfo.isCancel,jdbcType=VARCHAR},
+				#{usersInfo.createUserId,jdbcType=VARCHAR},#{usersInfo.createTime,jdbcType=TIMESTAMP},
+				#{usersInfo.updateUserId,jdbcType=VARCHAR},#{usersInfo.updateTime,jdbcType=TIMESTAMP}
+				)
+			</foreach>
+			select 1 from dual
+
+	</insert>
+	
+	<select id="queryAgentUser" parameterType="map" resultType="java.util.Map">
+	    select t.user_name,nvl(o.org_name,ao.ao_name) as org_name,t.mobile_phone,t.real_name from Users t
+		left join org o on t.admin_org_id = o.org_id
+		left join agent_org ao on t.admin_org_id = ao.ao_id
+		where t.users_id = #{userId}
+	</select>
+	<update id="updateUserRoleByUserId" parameterType="map">
+	    update USERS_ROLE t set t.role_id = #{roleId} where t.users_id = #{userId} 
+	</update>
+</mapper>

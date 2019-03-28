@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ The MIT License (MIT)
+  ~
+  ~ Copyright (c) 2014-2016 abel533@gmail.com
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy
+  ~ of this software and associated documentation files (the "Software"), to deal
+  ~ in the Software without restriction, including without limitation the rights
+  ~ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  ~ copies of the Software, and to permit persons to whom the Software is
+  ~ furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in
+  ~ all copies or substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  ~ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  ~ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  ~ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  ~ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  ~ THE SOFTWARE.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.UserMapper">
+	<!-- 查询所有的用户 -->
+	<select id="findAllUsers" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Users">
+		select
+	       t.users_id AS userId,
+	       t.department_id AS departmentId,
+	       t.department_Name AS departmentName,
+	       t.user_name AS userName,
+	       t.password AS password,
+	       t.real_name AS realName,
+	       t.post AS post,
+	       t.tel AS tel,
+	       t.mobile_phone AS mobilePhone,
+	       t.email AS email,
+	       t.security_level AS securityLevel,
+	       t.user_no AS userNo,
+	       t.is_valid AS isValid,
+	       t.is_cancel AS isCancel,
+	       t.user_type AS userType
+	  	from USERS t where t.user_type != 5
+		  	<if test="realName !=null and realName != ''">
+		  		and t.real_name = #{realName,jdbcType=VARCHAR}
+		  	</if>
+		  	<if test="departmentId !=null and departmentId != ''">
+		  		and t.department_Id = #{departmentId,jdbcType=VARCHAR}
+		  	</if>
+	</select>
+	<select id="findByUsers" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Users">
+		select
+	       t.USERS_ID AS userId,
+	       t.DEPARTMENT_ID AS departmentId,
+	       t.USER_NAME AS userName,
+	       t.PASSWORD AS password,
+	       t.REAL_NAME AS realName,
+	       t.POST AS post,
+	       t.TEL AS tel,
+	       t.MOBILE_PHONE AS mobilePhone,
+	       t.EMAIL AS email,
+	       t.SECURITY_LEVEL AS securityLevel,
+	       t.USER_NO AS userNo,
+	       t.IS_VALID AS isValid,
+	       t.IS_CANCEL AS isCancel,
+	       t.USER_TYPE AS userType
+	  	from USERS t where 1=1
+		  	<if test="userName !=null">
+		  		and t.user_name = #{userName,jdbcType=VARCHAR}
+		  	</if>
+		  	<if test="departmentId !=null">
+		  		and t.department_id = #{departmentId,jdbcType=VARCHAR}
+		  	</if>
+	</select>
+	<update id="updateUser" parameterType="net.greatsoft.core.domain.model.system.Users">
+		update USERS set
+			USER_ID = #{userId,jdbcType=VARCHAR},
+			DEPARTMENT_ID= #{departmentId,jdbcType=VARCHAR},
+			DEPARTMENT_NAME = #{departmentName,jdbcType=VARCHAR},
+			USER_NAME = #{userName,jdbcType=VARCHAR},
+			PASSWORD = #{password,jdbcType=VARCHAR},
+			REAL_NAME = #{realName,jdbcType=VARCHAR},
+			POST = #{post,jdbcType=VARCHAR},
+			TAME = #{tame,jdbcType=VARCHAR},
+			TEL = #{tel,jdbcType=VARCHAR},
+			EMAIL = #{email,jdbcType=VARCHAR},
+			SECURITY_LEVEL = #{securityLevel,jdbcType=VARCHAR},
+			USER_NO = #{userNo,jdbcType=VARCHAR},
+			IS_VALID = #{isValid,jdbcType=VARCHAR},
+			IS_CANCEL =#{isCancel,jdbcType=VARCHAR},
+			USER_TYPE = #{userType,jdbcType=VARCHAR}
+		where USERS_ID = #{userId,jdbcType=VARCHAR}
+	</update>
+</mapper>

@@ -1,0 +1,772 @@
+/*
+ * 版权所有 2017 冠新软件。
+ * 保留所有权利。
+ */
+package net.greatsoft.core.domain.model.system;
+
+import java.io.Serializable;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.persistence.*;
+
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.util.ProjectUtils;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+/**
+ * 用户表
+ */
+@Entity
+@Table(name = "USERS")
+public class User implements Serializable {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * 主键id
+	 */
+	@Id
+	@GeneratedValue(generator = "system-uuid")
+	@GenericGenerator(name = "system-uuid", strategy = "uuid2")
+	@Column(name = "USERS_ID", nullable = false, length = 36)
+	private String id;
+
+	/**
+	 * 账户名称
+	 */
+	@Column(name = "USER_NAME", nullable = false, length = 50)
+	private String name;
+
+	/**
+	 * 系统代码
+	 */
+	@Column(name = "USER_CODE", nullable = false, length = 50)
+	private String code;
+
+	/**
+	 * 密码
+	 */
+	@Column(name = "PASSWORD", nullable = false, length = 128)
+	private String password;
+
+	/**
+	 * 密码盐
+	 */
+	@Column(name = "PASSWORD_SALT", nullable = false, length = 128)
+	private String passwordSalt;
+
+	/**
+	 * 用户真实姓名
+	 */
+	@Column(name = "REAL_NAME", nullable = false, length = 50)
+	private String realName;
+
+	/**
+	 * 编号
+	 */
+	@Column(name = "USER_NO", nullable = false, length = 20)
+	private String no;
+
+	/**
+	 * 用户性别<br>
+	 * 1:男2：女
+	 */
+	@Column(name = "SEX", nullable = false, length = 1)
+	private Integer sex;
+
+	/**
+	 * 用户民族
+	 */
+	@Column(name = "NATION", nullable = false, length = 3)
+	private String nation;
+
+	/**
+	 * 籍贯
+	 */
+	@Column(name = "NATIVE_PLACE", nullable = false, length = 100)
+	private String nativePlace;
+
+	/**
+	 * 出生日期
+	 */
+	@Column(name = "BIRTHDAY", nullable = false)
+	@Temporal(TemporalType.DATE)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+	private Date birthdate;
+
+	/**
+	 * 身份证号
+	 */
+	@Column(name = "IDNO", nullable = false, length = 18)
+	private String idNo;
+
+	/**
+	 * 住址
+	 */
+	@Column(name = "ADDRESS", nullable = false, length = 100)
+	private String address;
+
+	/**
+	 * 邮编
+	 */
+	@Column(name = "POSTCODE", length = 6)
+	private String postcode;
+
+	/**
+	 * 描述
+	 */
+	@Column(name = "USER_DESCRIBE", length = 200)
+	private String description;
+
+	/**
+	 * 岗位
+	 */
+	@Column(name = "POST", length = 50)
+	private String post;
+
+	/**
+	 * 电话
+	 */
+	@Column(name = "TEL", length = 20)
+	private String tel;
+
+	/**
+	 * 移动电话
+	 */
+	@Column(name = "MOBILE_PHONE", length = 20)
+	private String mobilePhone;
+
+	/**
+	 * 电子邮件
+	 */
+	@Column(name = "EMAIL", length = 6)
+	private String email;
+
+	/**
+	 * 安全级别
+	 */
+	@Column(name = "SECURITY_LEVEL", length = 20)
+	private String securityLevel;
+
+	/**
+	 * 注册管理单位id
+	 */
+	@Column(name = "ADMIN_ORG_ID", length = 36)
+	private String adminOrganizationId;
+
+	/**
+	 * 用户类型<br>
+	 * 1:管理员，9：普通用户
+	 */
+	@Column(name = "USER_TYPE", length = 2)
+	private Integer type;
+
+	/**
+	 * 是否启用
+	 */
+	@Column(name = "IS_VALID", length = 1)
+	private Integer isValid;
+
+	/**
+	 * 是否删除
+	 */
+	@Column(name = "IS_CANCEL", length = 1)
+	private Integer isCancel;
+
+	/**
+	 * 创建人id
+	 */
+	@Column(name = "CREATE_USERS", length = 36)
+	private String createUserId;
+
+	/**
+	 * 创建时间
+	 */
+	@Column(name = "CREATE_TIME")
+	@Temporal(TemporalType.DATE)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd hh:mm:ss")
+	private Date createTime;
+
+	/**
+	 * 修改人id
+	 */
+	@Column(name = "UPDATE_USERS", length = 36)
+	private String updateUserId;
+
+	/**
+	 * 修改时间
+	 */
+	@Column(name = "UPDATE_TIME")
+	@Temporal(TemporalType.DATE)
+	@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd hh:mm:ss")
+	private Date updateTime;
+	
+	@Column(name = "IS_AGENT", length = 1)
+	private Integer isAgent;
+	
+	/**
+	 * 末次操作任务id
+	 */
+	@Column(name = "TASK_ID")
+	private String taskId;
+	
+	/**
+	 * 末次操作表期id
+	 */
+	@Column(name = "PERIOD_ID")
+	private String perId;
+	
+	@Column(name = "TASK_ORG_ID")
+	private String taskOrgId;
+
+	@Transient
+	private String token;
+	
+	@Column(name = "EMP_ID")
+	private String empId;
+
+	@Transient
+	private String roleId;
+	
+	
+	@ManyToMany(fetch = FetchType.LAZY)
+	@JoinTable(name = "USERS_ROLE", joinColumns = {
+			@JoinColumn(name = "USERS_ID")}, inverseJoinColumns = {
+					@JoinColumn(name = "ROLE_ID")})
+	private Set<Role> roles;
+	
+	
+	
+	/**
+	 * 加入机构名称,方便页面显示
+	 */
+	@Transient
+	private String orgName;
+
+	@OneToOne(fetch=FetchType.LAZY, cascade = CascadeType.ALL) //JPA注释： 一对一 关系
+	//referencedColumnName：参考列名,默认的情况下是列表的主键
+	//nullable=是否可以为空，
+	//insertable：是否可以插入，
+	//updatable：是否可以更新
+	// columnDefinition=列定义，
+	//foreignKey=外键
+	@JoinColumn(name="admin_org_id",referencedColumnName="org_id",nullable=false,insertable = false,updatable = false)
+	private Org org;
+	
+	
+	public String getOrgName() {
+		return orgName;
+	}
+
+	public Org getOrg() {
+		return org;
+	}
+
+	public void setOrg(Org org) {
+		this.org = org;
+	}
+
+	public void setOrgName(String orgName) {
+		this.orgName = orgName;
+	}
+
+	public User() {
+		this.roles = new HashSet<>();
+	}
+
+	/**
+	 * 主键id
+	 */
+	public String getId() {
+		return id;
+	}
+
+	/**
+	 * 主键id
+	 */
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	/**
+	 * 账户名称
+	 */
+	public String getName() {
+		return name;
+	}
+
+	/**
+	 * 账户名称
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	/**
+	 * 系统代码
+	 */
+	public String getCode() {
+		return code;
+	}
+
+	/**
+	 * 系统代码
+	 */
+	public void setCode(String code) {
+		this.code = code;
+	}
+
+	/**
+	 * 密码
+	 */
+	public String getPassword() {
+		return password;
+	}
+
+	/**
+	 * 密码
+	 */
+	public void setPassword(String password) {
+		this.password = password;
+	}
+
+	/**
+	 * 密码盐
+	 */
+	public String getPasswordSalt() {
+		return passwordSalt;
+	}
+
+	/**
+	 * 密码盐
+	 */
+	public void setPasswordSalt(String passwordSalt) {
+		this.passwordSalt = passwordSalt;
+	}
+
+	/**
+	 * 用户真实姓名
+	 */
+	public String getRealName() {
+		return realName;
+	}
+
+	/**
+	 * 用户真实姓名
+	 */
+	public void setRealName(String realName) {
+		this.realName = realName;
+	}
+
+	/**
+	 * 编号
+	 */
+	public String getNo() {
+		return no;
+	}
+
+	/**
+	 * 编号
+	 */
+	public void setNo(String no) {
+		this.no = no;
+	}
+
+	/**
+	 * 用户性别<br>
+	 * 1:男2：女
+	 */
+	public Integer getSex() {
+		return sex;
+	}
+
+	/**
+	 * 用户性别<br>
+	 * 1:男2：女
+	 */
+	public void setSex(Integer sex) {
+		this.sex = sex;
+	}
+
+	/**
+	 * 用户民族
+	 */
+	public String getNation() {
+		return nation;
+	}
+
+	/**
+	 * 用户民族
+	 */
+	public void setNation(String nation) {
+		this.nation = nation;
+	}
+
+	/**
+	 * 籍贯
+	 */
+	public String getNativePlace() {
+		return nativePlace;
+	}
+
+	/**
+	 * 籍贯
+	 */
+	public void setNativePlace(String nativePlace) {
+		this.nativePlace = nativePlace;
+	}
+
+	/**
+	 * 出生日期
+	 */
+	public Date getBirthdate() {
+		return birthdate;
+	}
+
+	/**
+	 * 出生日期
+	 */
+	public void setBirthdate(Date birthdate) {
+		this.birthdate = birthdate;
+	}
+
+	/**
+	 * 身份证号
+	 */
+	public String getIdNo() {
+		return idNo;
+	}
+
+	/**
+	 * 身份证号
+	 */
+	public void setIdNo(String idNo) {
+		this.idNo = idNo;
+	}
+
+	/**
+	 * 住址
+	 */
+	public String getAddress() {
+		return address;
+	}
+
+	/**
+	 * 住址
+	 */
+	public void setAddress(String address) {
+		this.address = address;
+	}
+
+	/**
+	 * 邮编
+	 */
+	public String getPostcode() {
+		return postcode;
+	}
+
+	/**
+	 * 邮编
+	 */
+	public void setPostcode(String postcode) {
+		this.postcode = postcode;
+	}
+
+	/**
+	 * 描述
+	 */
+	public String getDescription() {
+		return description;
+	}
+
+	/**
+	 * 描述
+	 */
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	/**
+	 * 岗位
+	 */
+	public String getPost() {
+		return post;
+	}
+
+	/**
+	 * 岗位
+	 */
+	public void setPost(String post) {
+		this.post = post;
+	}
+
+	/**
+	 * 电话
+	 */
+	public String getTel() {
+		return tel;
+	}
+
+	/**
+	 * 电话
+	 */
+	public void setTel(String tel) {
+		this.tel = tel;
+	}
+
+	/**
+	 * 移动电话
+	 */
+	public String getMobilePhone() {
+		return mobilePhone;
+	}
+
+	/**
+	 * 移动电话
+	 */
+	public void setMobilePhone(String mobilePhone) {
+		this.mobilePhone = mobilePhone;
+	}
+
+	/**
+	 * 电子邮件
+	 */
+	public String getEmail() {
+		return email;
+	}
+
+	/**
+	 * 电子邮件
+	 */
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	/**
+	 * 安全级别
+	 */
+	public String getSecurityLevel() {
+		return securityLevel;
+	}
+
+	/**
+	 * 安全级别
+	 */
+	public void setSecurityLevel(String securityLevel) {
+		this.securityLevel = securityLevel;
+	}
+
+	/**
+	 * 注册管理单位id
+	 */
+	public String getAdminOrganizationId() {
+		return adminOrganizationId;
+	}
+
+	/**
+	 * 注册管理单位id
+	 */
+	public void setAdminOrganizationId(String adminOrganizationId) {
+		this.adminOrganizationId = adminOrganizationId;
+	}
+
+	/**
+	 * 用户类型<br>
+	 * 1：系统管理员 2：省级注册管理中心 3：市级注册管理中心
+	 * 4：省级医疗机构5：省级金融机构6：市级医疗机构7：市级金融机构8：区县卫生局9：区县医疗机构10：区县金融机构11：乡镇卫生院12：
+	 * 乡镇医疗机构13:乡镇金融机构14：村卫生室
+	 */
+	public Integer getType() {
+		return type;
+	}
+
+	/**
+	 * 用户类型<br>
+	 * 1：系统管理员 2：省级注册管理中心 3：市级注册管理中心
+	 * 4：省级医疗机构5：省级金融机构6：市级医疗机构7：市级金融机构8：区县卫生局9：区县医疗机构10：区县金融机构11：乡镇卫生院12：
+	 * 乡镇医疗机构13:乡镇金融机构14：村卫生室
+	 */
+	public void setType(Integer type) {
+		this.type = type;
+	}
+
+	/**
+	 * 是否启用
+	 */
+	public Integer getIsValid() {
+		return isValid;
+	}
+
+	/**
+	 * 是否启用
+	 */
+	public void setIsValid(Integer isValid) {
+		this.isValid = isValid;
+	}
+
+	/**
+	 * 是否删除
+	 */
+	public Integer getIsCancel() {
+		return isCancel;
+	}
+
+	/**
+	 * 是否删除
+	 */
+	public void setIsCancel(Integer isCancel) {
+		this.isCancel = isCancel;
+	}
+
+	/**
+	 * 创建人id
+	 */
+	public String getCreateUserId() {
+		return createUserId;
+	}
+
+	/**
+	 * 创建人id
+	 */
+	public void setCreateUserId(String createUserId) {
+		this.createUserId = createUserId;
+	}
+
+	/**
+	 * 创建时间
+	 */
+	public Date getCreateTime() {
+		return createTime;
+	}
+
+	/**
+	 * 创建时间
+	 */
+	public void setCreateTime(Date createTime) {
+		this.createTime = createTime;
+	}
+
+	/**
+	 * 修改人id
+	 */
+	public String getUpdateUserId() {
+		return updateUserId;
+	}
+
+	/**
+	 * 修改人id
+	 */
+	public void setUpdateUserId(String updateUserId) {
+		this.updateUserId = updateUserId;
+	}
+
+	/**
+	 * 修改时间
+	 */
+	public Date getUpdateTime() {
+		return updateTime;
+	}
+
+	/**
+	 * 修改时间
+	 */
+	public void setUpdateTime(Date updateTime) {
+		this.updateTime = updateTime;
+	}
+
+	public String getToken() {
+		return token;
+	}
+
+	public void setToken(String token) {
+		this.token = token;
+	}
+
+	public Set<Role> getRoles() {
+		return roles;
+	}
+
+	public void setRoles(Set<Role> roles) {
+		this.roles = roles;
+	}
+	
+	/**
+	 * 设置操作用户信息
+	 */
+	@Transient
+	public void modifiedBy(UserDto user) {
+		if (this.createUserId == null) {
+			this.createUserId = user.getId();
+			this.createTime = new Date();
+		}
+		this.updateUserId = user.getId();
+		this.updateTime = new Date();
+	}
+
+	@Override
+	public String toString() {
+		return "User [id=" + id + ", name=" + name + ", code=" + code + ", password=" + password + ", passwordSalt="
+				+ passwordSalt + ", realName=" + realName + ", no=" + no + ", sex=" + sex + ", nation=" + nation
+				+ ", nativePlace=" + nativePlace + ", birthdate=" + birthdate + ", idNo=" + idNo + ", address="
+				+ address + ", postcode=" + postcode + ", description=" + description + ", post=" + post + ", tel="
+				+ tel + ", mobilePhone=" + mobilePhone + ", email=" + email + ", securityLevel=" + securityLevel
+				+ ", adminOrganizationId=" + adminOrganizationId + ", type=" + type + ", isValid=" + isValid
+				+ ", isCancel=" + isCancel + ", isAgent=" + isAgent + ", createUserId=" + createUserId + ", createTime=" + createTime
+				+ ", updateUserId=" + updateUserId + ", updateTime=" + updateTime + ", token=" + token + ", roles="
+				+ roles + "]";
+	}
+
+	public String getTaskId() {
+		return taskId;
+	}
+
+	public void setTaskId(String taskId) {
+		this.taskId = taskId;
+	}
+
+	public String getPerId() {
+		return perId;
+	}
+
+	public void setPerId(String perId) {
+		this.perId = perId;
+	}
+
+	public String getTaskOrgId() {
+		return taskOrgId;
+	}
+
+	public void setTaskOrgId(String taskOrgId) {
+		this.taskOrgId = taskOrgId;
+	}
+
+	public String getRoleId() {
+		return roleId;
+	}
+
+	public void setRoleId(String roleId) {
+		this.roleId = roleId;
+	}
+
+	public String getEmpId() {
+		return empId;
+	}
+
+	public void setEmpId(String empId) {
+		this.empId = empId;
+	}
+
+	public Integer getIsAgent() {
+		return isAgent;
+	}
+
+	public void setIsAgent(Integer isAgent) {
+		this.isAgent = isAgent;
+	}
+	
+	
+}

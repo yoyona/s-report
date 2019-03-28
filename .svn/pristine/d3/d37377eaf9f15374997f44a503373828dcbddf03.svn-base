@@ -1,0 +1,716 @@
+package net.greatsoft.core.service.task;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import net.greatsoft.core.domain.model.task.*;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import net.greatsoft.core.domain.mapper.AuditRecordMapper;
+import net.greatsoft.core.domain.mapper.FileAdditionalMapper;
+import net.greatsoft.core.domain.mapper.NoticeMapper;
+import net.greatsoft.core.domain.mapper.TaskMapper;
+import net.greatsoft.core.domain.mapper.TaskScopeMapper;
+import net.greatsoft.core.domain.mapper.TaskUserMapper;
+import net.greatsoft.core.domain.mapper.TemplateInfoMapper;
+import net.greatsoft.core.domain.mapper.UserMapper;
+import net.greatsoft.core.domain.model.system.Notice;
+import net.greatsoft.core.domain.model.system.NoticeUserRel;
+import net.greatsoft.core.domain.model.system.OrgHistory;
+import net.greatsoft.core.domain.model.system.User;
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.dto.task.OrgDto;
+import net.greatsoft.core.dto.task.TaskCategoryDto;
+import net.greatsoft.core.repository.system.NoticeRepository;
+import net.greatsoft.core.repository.system.OrgHistoryRepository;
+import net.greatsoft.core.repository.system.OrgRepository;
+import net.greatsoft.core.repository.task.AttachmentRepository;
+import net.greatsoft.core.repository.task.FileAdditionalRepository;
+import net.greatsoft.core.repository.task.TaskRepository;
+import net.greatsoft.core.repository.task.TemplateInfoRepository;
+import net.greatsoft.core.service.notice.NoticeService;
+import net.greatsoft.core.util.FileUtils;
+import net.greatsoft.core.util.constant.ExecuteConstant;
+import net.greatsoft.core.util.constant.MessageConstant;
+import net.greatsoft.core.web.dto.ResultDto;
+
+@Service
+public class TaskService {
+	@Autowired
+	private TaskMapper taskMapper;
+	
+	@Autowired
+	private TaskRepository taskRepository;
+	
+	@Autowired
+	private FileAdditionalRepository fileAdditionalRepository;
+	
+	@Autowired
+	private NoticeRepository noticeRepository;
+	
+	@Autowired
+	private FileAdditionalMapper fileAdditionalMapper;
+	
+	@Autowired
+	private TemplateInfoRepository templateInfoRepository;
+	
+	@Autowired
+	private TemplateInfoMapper templateInfoMapper;
+	
+	@Autowired
+	private TaskScopeMapper taskScopeMapper;
+	
+	@Autowired
+	private AuditRecordMapper auditRecordMapper;
+	
+	@Autowired
+	private TaskUserMapper taskUserMapper;
+	
+	@Autowired
+	private UserMapper userMapper;
+	
+	@Autowired
+	private OrgHistoryRepository orgHistoryRepository;
+	
+	@Autowired
+	private OrgRepository orgRepository;
+	
+	@Autowired
+	private NoticeMapper noticeMapper;
+	
+	@Autowired
+	private NoticeService noticeService;
+	
+	@Autowired
+	private AttachmentRepository attachmentRepository;
+	
+	@Value("${file.path.formal}")
+	private String formalPath;
+	
+	@Value("${file.path.temp}")
+	private String tempPath;
+	/**
+	 * 查询所有的任务信息
+	 * @param map
+	 * @return
+	 */
+	public List<Task> findAllTasks(Map<String,Object> map){
+		return this.taskMapper.findAllTasks(map);
+	}
+	/**
+	 * 级联保存任务信息
+	 * @param task
+	 * @return
+	 */
+	@Transactional
+	public Task add(Task task) {
+		
+		//将附件信息的保存的路径改为正式文件夹的路径
+		List<FileAdditional> files = task.getFileAdditionals();
+		if(files != null && files.size() > 0 ){
+			List<FileAdditional> dealFileAdditional = replaceFileAdditional(files);
+			task.setFileAdditionals(dealFileAdditional);
+		}
+		taskRepository.save(task);
+		return task;
+	}
+	/**
+	 * 通过id查询单条任务信息
+	 * @param id
+	 * @return
+	 */
+	public Map<String,Object> get(Long id) {
+		Map<String,Object> r = new HashMap<String,Object>();
+		Task task = taskRepository.findTaskByTaskId(id);
+		r.put("period", task.getPeriods());
+		r.put("files", task.getFileAdditionals());
+		r.put("task", task);
+		return  r;
+	}
+	/**
+	 * 级联保存任务信息
+	 * @param task
+	 * @return
+	 */
+	@Transactional
+	public ResultDto update(Task task) { 
+		// 判断任务是否是打开的状态
+		String status = task.getStatus();
+		if(status == null || "".equals(status)){
+			// 这儿说明页面获取不到
+			Task findTaskByTaskId = this.taskRepository.findTaskByTaskId(task.getTaskId());
+			/*if("2".equals(findTaskByTaskId.getStatus())){*/
+			if(ExecuteConstant.TASK_STATUS_OPEN.equals(findTaskByTaskId.getStatus())){
+				return new ResultDto(ResultDto.CODE_FAIL,"任务处于打开的状态,不能进行编辑",task);
+			}
+		/*}else if("2".equals(status)){*/
+		}else if(ExecuteConstant.TASK_STATUS_OPEN.equals(status)){
+			// 任务处于打开的状态不让编辑
+			return new ResultDto(ResultDto.CODE_FAIL,"任务处于打开的状态,不能进行编辑",task);
+		}
+		// 替换
+		List<FileAdditional> files = task.getFileAdditionals();
+		if(files != null && files.size() > 0 ){
+			List<FileAdditional> dealFileAdditional = replaceFileAdditional(files);
+			task.setFileAdditionals(dealFileAdditional);
+		}else{
+			//对象里面没有相应的附件信息,如果本身是有的话需要删除本身有的附件信息
+			//查询指定任务的附件信息列表
+			List<FileAdditional> fileAdditionals = fileAdditionalRepository.findAdditionalByTaskId(String.valueOf(task.getTaskId()));
+			if(fileAdditionals != null && fileAdditionals.size() > 0){
+				//删除文件
+				deleteFileAdditionals(fileAdditionals);
+				//删除记录
+				fileAdditionalMapper.deleteFileAdditionalByTaskId(String.valueOf(task.getTaskId()));
+			}
+		}
+		this.taskRepository.save(task);
+		
+		return new ResultDto(ResultDto.CODE_SUCCESS,"编辑成功",task);
+	}
+	/**
+	 * 辅助方法,将保存在附件信息表里面的临时文件路径替换为正式路径,并且将文件复制到正式文件夹
+	 * @param fileAdditionals
+	 * @return
+	 */
+	private List<FileAdditional> replaceFileAdditional(List<FileAdditional> fileAdditionals){
+		List<FileAdditional> fileAdditionalsC = new ArrayList<FileAdditional>();
+		for (FileAdditional fileAdditional : fileAdditionals) {
+			String name = fileAdditional.getFileName();
+			String url = fileAdditional.getFileUrl();
+			if(StringUtils.isNotEmpty(url) && !name.contains(formalPath)){
+				fileAdditional.setFileUrl(url.replace(tempPath, formalPath));
+			}
+			if(StringUtils.isNotEmpty(url) && !name.contains(formalPath)){
+				fileAdditionalsC.add(fileAdditional);
+				//复制文件到正式文件夹
+				FileUtils.copyFiles(url, fileAdditional.getFileUrl());
+			}
+		}
+		return  fileAdditionalsC;
+	}
+	/**
+	 * 批量删除硬盘中的附件表信息文件
+	 * @param fileAdditionals
+	 */
+	private void deleteFileAdditionals(List<FileAdditional> fileAdditionals) {
+		for (FileAdditional fileAdditional : fileAdditionals) {
+			String url = fileAdditional.getFileUrl();
+			if(StringUtils.isNotEmpty(url)){
+				File f = new File(url);
+				if(f.exists()){
+					f.delete();
+				}
+			}
+			
+		}
+		
+	}
+	/**
+	 * 任务模板绑定(为任务指定对应的亿信华辰模板名称)
+	 * @param templateInfo
+	 * @return
+	 */
+	public List<TemplateInfo> binding(List<TemplateInfo> templateInfo) {
+		//预先删除对应任务和机构的模板
+//		if(!templateInfo.isEmpty()){
+//			Map<String,Object> param = new HashMap<String,Object>();
+//			param.put("taskId", templateInfo.get(0).getTaskId());
+//			/*param.put("orgId",templateInfo.get(0).getOrgId());*/
+//			Integer result = this.templateInfoMapper.deleteByTaskIdAndOrgId(param);
+//		}
+//		
+		//循环插入信息
+		for (TemplateInfo templateInfo2 : templateInfo) {
+			TemplateInfo  save = templateInfoRepository.save(templateInfo2);
+		}
+		return templateInfo;
+	}
+	
+	/**
+	 * 级联删除单条任务信息
+	 * @param id
+	 */
+	@Transactional
+	public Integer delete(Long id) {
+		Integer result = this.taskRepository.deleteTaskByTaskId(id);
+		return result;
+	}
+	/**
+	 * 发布任务(取消发布)
+	 * 整体流程:暂存(默认)-->发布 -- 打开
+	 * 发布时,进来的是暂存的状态,将状态修改为发布,并且删除之前任务范围里面关联的审核记录,并且批量新增相应的审核记录
+	 * 取消发布时,进来的发布的状态,直接修改为暂存
+	 * @param taskId
+	 * @return
+	 */
+	@Transactional
+	public Integer release(Long taskId,String status,String type,UserDto user) {
+		Task task = new Task();
+		task.setTaskId(taskId);
+		Integer updateTask = 0;
+		if("0".equals(status)){
+			/*task.setStatus("1");*/
+			task.setStatus(ExecuteConstant.TASK_STATUS_INIT);
+			updateTask = this.taskMapper.updateTask(task);
+		}else if("1".equals(status) ){
+			//TODO 需要验证任务是否绑定任务范围,已经绑定了模板
+		     //删除审核记录
+			List<AuditRecord> list = new ArrayList<AuditRecord>();
+			//新增审核记录 根据表期*机构范围里面的机构数
+			// Task task1 = this.taskRepository.findTaskByTaskId(taskId);
+			//查询指定机构的任务范围的信息
+			List<Map<String, Object>> resultMap = this.taskScopeMapper.getPeriodAndTaskScope(taskId);
+			if (resultMap != null && !resultMap.isEmpty()) {
+				for (int i = 0; i < resultMap.size(); i++) {
+					Map<String, Object> map = resultMap.get(i);
+					Object perIdObj = map.get("PERID");
+					Object orgIdObj = map.get("ORGID");
+					if (perIdObj == null || orgIdObj == null) {
+						continue;
+					}
+					String perId = String.valueOf(perIdObj);
+					String orgId = String.valueOf(orgIdObj);
+					AuditRecord auditRecord = new AuditRecord();
+					auditRecord.setOrgId(orgId);
+					auditRecord.setPerId(perId);
+					/*auditRecord.setStatus("9");*/
+					auditRecord.setStatus(ExecuteConstant.CHECK_STATUS_INIT);
+					/*auditRecord.setSummaryStatus("0");*/
+					auditRecord.setSummaryStatus(ExecuteConstant.CHECK_SUMMARY_STATUS_INIT);
+//					auditRecord.setSubmitTime(new Date());
+					auditRecord.setSubmitUserId(user.getId());
+					auditRecord.setChangeTime("0");
+					auditRecord.setTaskId(String.valueOf(taskId));
+					list.add(auditRecord);
+				}
+			}
+			if(!list.isEmpty()){
+				this.auditRecordMapper.deleteAuditRecordByTaskId(taskId);
+				int size = list.size();
+				if(size < 200){
+					auditRecordMapper.insertAuditRecordBatch(list);
+				}else{
+					int result = 0 ;
+					for(int i = 0;i < size ; i= i + 200 ){
+						result = i + 200;
+						if(result > size){
+							result = size;
+						}
+						List<AuditRecord> subList = list.subList(i, result);
+						auditRecordMapper.insertAuditRecordBatch(subList);
+					}
+				}
+			}
+			List<TaskUser> taskUserList  = new ArrayList<TaskUser>();
+			Map<String,Object> param = new HashMap<String,Object>();
+			param.put("taskId", taskId);
+			param.put("type", type);
+			List<Map<String, Object>> rMap = this.taskScopeMapper.getUsersAndTaskScope(param);
+			
+			if (rMap !=null && !rMap.isEmpty()) {
+				for (int i = 0; i < rMap.size(); i++) {
+					Map<String, Object> map = rMap.get(i);
+					String id = String.valueOf(map.get("USERID"));
+					TaskUser tu = new TaskUser();
+					tu.setTaskId(String.valueOf(taskId));
+					tu.setUserId(id);
+					taskUserList.add(tu);
+				}
+			}
+			
+		if (!taskUserList.isEmpty()) {
+			this.taskUserMapper.deleteByTaskId(taskId);
+			int size = taskUserList.size();
+			if(size < 200){
+				taskUserMapper.insertTaskUserBatch(taskUserList);
+			}else{
+				int result = 0 ;
+				for(int i = 0;i < size ; i= i + 200 ){
+					result = i + 200;
+					if(result > size){
+						result = size;
+					}
+					List<TaskUser> subList = taskUserList.subList(i, result);
+					taskUserMapper.insertTaskUserBatch(subList);
+				}
+			}
+		}	
+		/*task.setStatus("0");*/
+		task.setStatus(ExecuteConstant.TASK_STATUS_RELEASE);
+		updateTask = this.taskMapper.updateTask(task);
+	  } 
+		
+		List userIds = noticeMapper.findUsersByTaskId(String.valueOf(taskId));
+		Task taskNew = taskRepository.findTaskByTaskId(taskId);
+		//发送系统通知
+		noticeService.sendMessage(taskNew,user.getAdminOrganizationId(),taskNew.getTaskName() + MessageConstant.CREATE_TASK_ORG_MSG,userIds,user,null);
+		return updateTask;
+	}
+	
+	/**
+	 * 打开任务(任务开关)
+	 * @param taskId
+	 * @return
+	 */
+	@Transactional
+	public Integer switchTask(Long taskId, String status, UserDto user) {
+		Task task = new Task();
+		task.setTaskId(taskId);
+		Integer updateTask = 0;
+		if("2".equals(status)){
+			//当前任务状态是打开的,如果进来那么就要关闭它,修改状态为发布
+			/*task.setStatus("0");*/
+			task.setStatus(ExecuteConstant.TASK_STATUS_RELEASE);
+			updateTask = this.taskMapper.updateTask(task);
+		}else if("0".equals(status)){
+			//当前任务状态发布,如果进来那么就要打开它,修改状态为打开
+			/*task.setStatus("2");*/
+			task.setStatus(ExecuteConstant.TASK_STATUS_OPEN);
+			updateTask = this.taskMapper.updateTask(task);
+		}
+		//更新成功后并且是发布状态，则对任务范围内机构人员发送提醒通知
+		/*if(updateTask == 1 && "2".equals(task.getStatus())){*/
+		if(updateTask == 1 && ExecuteConstant.TASK_STATUS_OPEN.equals(task.getStatus())){
+			Task taskNew = taskRepository.findTaskByTaskId(taskId);
+			List<String> userIds = noticeMapper.findUsersByTaskId(String.valueOf(taskId));//
+			noticeService.sendMessage(taskNew,taskNew.getOrgId(),taskNew.getTaskName() + MessageConstant.FILL_TASK_ORG_MSG,userIds,user,null);
+		}
+		return updateTask;
+	}
+	/**
+	 * 批量新增任务范围(每次新增都删除之前所有,然后批量)
+	 * @param taskScopes
+	 */
+	@Transactional
+	public void scope(List<TaskScope> taskScopes,Long taskId,List<String> uniqueIdList) {
+		if(taskScopes.size() > 0 && taskScopes != null){
+			taskScopeMapper.deleteTaskScopeByTaskId(String.valueOf(taskId));
+			// taskScopeMapper.insertTaskScopeBatch(taskScopes);
+				int size = taskScopes.size();
+				if(size < 200){
+					taskScopeMapper.insertTaskScopeBatch(taskScopes);
+				}else{
+					int result = 0 ;
+					for(int i = 0;i < size ; i= i + 200 ){
+						result = i + 200;
+						if(result > size){
+							result = size;
+						}
+						List<TaskScope> subList = taskScopes.subList(i, result);
+						taskScopeMapper.insertTaskScopeBatch(subList);
+					}
+				}
+		}
+	}
+
+	/**
+	 * 拼接任务已选范围信息
+	 * @param taskId
+	 * @param orgId
+	 * @return
+	 */
+	public List<OrgDto> getTaskScope(Long taskId) {
+		//获取任务信息
+		Task task = taskRepository.findTaskByTaskId(taskId);
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId", taskId);
+		param.put("auditType", task.getAuditType());
+		List<OrgDto> acOrgList = taskScopeMapper.getACOrgList(param);
+		return acOrgList;
+	}
+	/**
+	 * 根据用户所属机构查询首页任务各类型数据量
+	 * @param orgId
+	 * @return
+	 */
+	public Map<String,Integer> getTaskCategoryList(String orgId){
+		List<TaskCategoryDto> list = taskMapper.getTaskCategoryList(orgId);
+		Map<String,Integer> map = new HashMap<String,Integer>();
+		for (int i = 0; i < list.size(); i++) {
+			map.put(list.get(i).getType(), list.get(i).getCount());
+		}
+		return map;
+	}
+	/**
+	 * 任务分配
+	 * @param taskUsers
+	 */
+	@Transactional
+	public void allocation(List<TaskUser> taskUsers) {
+		if(taskUsers != null && !taskUsers.isEmpty()){
+			//删除本来有的任务分配信息
+			this.taskUserMapper.deleteByTaskId(Long.valueOf(taskUsers.get(0).getTaskId()));
+			//批量导入任务分配信息
+			this.taskUserMapper.insertTaskUserBatch(taskUsers);
+		}
+	}
+	/**
+	 * 查询已选任务分配的信息
+	 * @param taskId
+	 * @return
+	 */
+	public List<User> allocationList(Long taskId) {
+		//获取任务信息
+		Task task = this.taskRepository.findTaskByTaskId(taskId);
+		Map<String,Object> param = new HashMap<String,Object>();
+		OrgHistory orgHistory = this.orgHistoryRepository.getOrgHistoryByOrgId(Long.valueOf(task.getOrgId()));
+		param.put("taskId", taskId);
+		param.put("orgId", orgHistory != null ? orgHistory.getUniqueId() : orgRepository.getOrgById(task.getOrgId()).getUniqueId());
+		return this.userMapper.getAllocationList(param);
+	}
+	/**
+	 * 获取指定机构下的所有机构的人员信息(任务分配树)
+	 * @param taskId
+	 * @return
+	 */
+	public List<User> allocationTree(String  adminOrganizationId) {
+		/*Task task = this.taskRepository.findTaskByTaskId(taskId);*/
+		Map<String,Object> param = new HashMap<String,Object>();
+		
+		param.put("orgId", adminOrganizationId);
+		List<User> allocationTree = this.userMapper.getAllocationTree(param);
+		return allocationTree;
+	}
+	/**
+	 * 删除单个任务附件信息
+	 * @param fileId
+	 * @return
+	 */
+	public void deleteFileAdditional(Long fileId) {
+		this.fileAdditionalRepository.delete(fileId);
+	}
+	/**
+	 * 查询已经绑定的模板信息
+	 * @param taskId
+	 * @return
+	 */
+	public List<TemplateInfo> bindingList(Long taskId) {
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId", taskId);
+		return this.templateInfoMapper.list(param);
+	}
+	/**
+	 * 删除单个模版信息
+	 * @param id
+	 */
+	public void deleteTemplateInfo(Long id) {
+		this.templateInfoRepository.delete(id);
+	}
+	/**
+	 * 下载文件
+	 * @param fileAdditional
+	 * @param request
+	 * @param response
+	 * @throws UnsupportedEncodingException 
+	 */
+	public void downloadFile(Long fileId, HttpServletRequest request, HttpServletResponse response){
+		FileAdditional fileAdditional = this.fileAdditionalRepository.getOne(fileId);
+		try {
+			
+			request.setCharacterEncoding("UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		response.setContentType("text/html;charset=UTF-8");
+		String filename = fileAdditional.getFileName();
+		download(response,fileAdditional.getFileUrl(),filename);
+	}
+	@SuppressWarnings("static-method")
+	  private void download(HttpServletResponse response, String filePath, String fileName) {
+	    File file = new File(filePath);
+	    FileInputStream fis;
+	    try {
+	      fis = new FileInputStream(file);
+	      response.reset();
+	      response.setContentType("application/octet-stream");
+	      response.addHeader("Content-Disposition",
+	          "attachment; filename=" + new String(fileName.getBytes("gb2312"),"ISO8859-1"));
+	      response.setHeader("Access-Control-Allow-Origin", "*");
+	      IOUtils.copy(fis, response.getOutputStream());
+	      response.flushBuffer();
+	      fis.close();
+	    } catch (FileNotFoundException e) {
+	      e.printStackTrace();
+	    } catch (IOException e) {
+	      e.printStackTrace();
+	    }
+	  }
+	
+	public void abandon(Task task) {
+		/*task.setStatus("9");*/
+		task.setStatus(ExecuteConstant.TASK_STATUS_DELETE);
+		this.taskRepository.save(task);
+	}
+	
+	public void downloadAttachment(Long fileId,HttpServletRequest request, HttpServletResponse response){
+		Attachment attachment = this.attachmentRepository.getOne(fileId);
+		String fileName = attachment.getFileName();
+		String fileUrl = attachment.getFileUrl();
+		fileName = fileName.substring(fileName.lastIndexOf("-") + 1, fileName.length());
+		try {
+			request.setCharacterEncoding("UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		response.setContentType("text/html;charset=UTF-8");
+		download(response,fileUrl,fileName);
+	}
+
+	/**
+	 * 动态增加任务范围和审核记录以及任务用户数据
+	 * @param uniqueIds
+	 * @param taskId
+	 * @param user
+	 */
+	@Transactional
+	public void dynamicTaskScope(List<String> uniqueIds, String taskId, UserDto user) {
+		// 查询任务有几个表期
+		// 每个表期的任务范围信息
+		// 求出差集 进行新增任务范围以及审核记录和用户信息
+		Task task = this.taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		List<Period> periods = task.getPeriods();
+		List<String> list = this.taskScopeMapper.getScopeOrgIdsByTaskId(Long.valueOf(taskId));
+		// 求差集
+		uniqueIds.addAll(list);
+		boolean remove = uniqueIds.removeAll(list);
+		/*if (!remove) {
+			return;
+		}*/
+		List<TaskScope> taskScopes = new ArrayList<TaskScope>();
+		List<AuditRecord> auditRecords = new ArrayList<AuditRecord>();
+		if(uniqueIds != null && uniqueIds.size() > 0){
+			for (int i = 0; i < uniqueIds.size(); i++) {
+				TaskScope taskScope = new TaskScope();
+				taskScope.setOrgId(uniqueIds.get(i));
+				taskScope.setTaskId(taskId);
+				taskScopes.add(taskScope);
+				// 组装审核信息
+				if (!periods.isEmpty()) {
+					for (int j = 0; j < periods.size(); j++) {
+						Period period = periods.get(j);
+						Long periodId = period.getPeriodId();
+
+						AuditRecord auditRecord = new AuditRecord();
+						auditRecord.setOrgId(uniqueIds.get(i));
+						auditRecord.setPerId(String.valueOf(periodId));
+						auditRecord.setStatus(ExecuteConstant.CHECK_STATUS_INIT);
+						auditRecord.setSummaryStatus(ExecuteConstant.CHECK_SUMMARY_STATUS_INIT);
+//						auditRecord.setSubmitUserId(user.getId());
+						auditRecord.setChangeTime("0");
+						auditRecord.setTaskId(String.valueOf(taskId));
+						auditRecords.add(auditRecord);
+					}
+				}
+			}
+		}
+		// 组装用户任务数据
+		List<TaskUser> taskUserList  = new ArrayList<TaskUser>();
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId", taskId);
+		param.put("orgList", uniqueIds);
+		List<User> users = this.userMapper.searchUser(param);
+		if (!users.isEmpty()) {
+			for (int i = 0; i < users.size(); i++) {
+				User user1 = users.get(i);
+				TaskUser tu = new TaskUser();
+				tu.setTaskId(taskId);
+				tu.setUserId(user1.getId());
+				taskUserList.add(tu);
+			}
+		}
+		// 插入任务范围数据
+		if(taskScopes.size() > 0 && taskScopes != null){
+			int size = taskScopes.size();
+			if (size < 200) {
+				taskScopeMapper.insertTaskScopeBatch(taskScopes);
+			} else {
+				int result = 0 ;
+				for(int i = 0;i < size ; i= i + 200 ){
+					result = i + 200;
+					if(result > size){
+						result = size;
+					}
+					List<TaskScope> subList = taskScopes.subList(i, result);
+					taskScopeMapper.insertTaskScopeBatch(subList);
+				}
+			}
+		}
+		// 插入审核记录信息
+		if(!auditRecords.isEmpty()){
+			int size = auditRecords.size();
+			if(size < 200){
+				auditRecordMapper.insertAuditRecordBatch(auditRecords);
+			}else{
+				int result = 0 ;
+				for(int i = 0;i < size ; i= i + 200 ){
+					result = i + 200;
+					if(result > size){
+						result = size;
+					}
+					List<AuditRecord> subList = auditRecords.subList(i, result);
+					auditRecordMapper.insertAuditRecordBatch(subList);
+				}
+			}
+		}
+		// 插入任务用户关联数据
+		if (!taskUserList.isEmpty()) {
+			int size = taskUserList.size();
+			if(size < 200){
+				taskUserMapper.insertTaskUserBatch(taskUserList);
+			}else{
+				int result = 0 ;
+				for(int i = 0;i < size ; i= i + 200 ){
+					result = i + 200;
+					if(result > size){
+						result = size;
+					}
+					List<TaskUser> subList = taskUserList.subList(i, result);
+					taskUserMapper.insertTaskUserBatch(subList);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 批量新增任务与用户关系信息
+	 * @param taskUsers
+	 */
+	@Transactional
+	public void insertTaskUserBatch(List<TaskUser> taskUsers) {
+		if(taskUsers != null && !taskUsers.isEmpty()){
+			int size = taskUsers.size();
+			if(size < 200){
+				taskUserMapper.insertTaskUserBatch(taskUsers);
+			}else{
+				int result = 0 ;
+				for(int i = 0;i < size ; i= i + 200 ){
+					result = i + 200;
+					if(result > size){
+						result = size;
+					}
+					List<TaskUser> subList = taskUsers.subList(i, result);
+					taskUserMapper.insertTaskUserBatch(subList);
+				}
+			}
+		}
+	}
+}

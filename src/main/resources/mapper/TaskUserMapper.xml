@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TaskUserMapper">
+	<delete id="deleteByTaskId" parameterType="Long">
+		delete from task_user where tu_taskid = #{taskId}
+	</delete>
+	<insert id="insertTaskUserBatch" parameterType="java.util.List">
+		insert all 
+	    <foreach collection="list" item="item" index="index" >
+	     into task_user
+	    	(TU_TASKID,TU_USERID)
+	    	values(
+   			#{item.taskId,jdbcType=VARCHAR},
+   			#{item.userId,jdbcType=VARCHAR}
+	    	)		
+	    </foreach>
+	    select * from dual 
+	</insert>
+	<select id="getACTaskUser" parameterType="map" resultType="map">
+		select t.user_name as "userName", t.tel as "tel", r.role_name as "roleName"
+		  from users t
+		  left join users_role ur
+		    on ur.users_id = t.users_id
+		  left join role r
+		    on ur.role_id = r.role_id
+		 where t.users_id in
+		       (select tu.tu_userid from task_user tu where tu.tu_taskid = #{taskId}) 
+		       and t.admin_org_id = #{orgId}
+	</select>
+</mapper>

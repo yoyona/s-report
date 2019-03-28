@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.FormulaMapper">
+	<select id="getFormulaList" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.for_formula_des,t.for_id 
+		from FORMULA t 
+		where t.for_taskid = #{taskId} 
+		and t.for_perid = #{perId}
+		and t.for_type = #{type}
+		order by t.for_formula_des
+	</select>
+	<select id="getFormulaById" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.for_sheetid,t.for_formulaid
+		from FORMULA t 
+		where t.for_id = #{formulaId}
+	</select>
+	<select id="getFormulaByType" parameterType="java.util.Map" resultType="java.util.Map">
+		select *
+		from FORMULA t 
+		where t.for_type = #{type}
+	</select>
+	<select id="queryFormulaExplain" parameterType="java.util.Map" resultType="java.util.Map">
+		select i.userid_,i.E2 from IJCBB_HSSM@WLZBDATA i 
+		where i.bbq_ = '2018----' and i.userid_ in ('4019302841307210','4887388333503220')
+		and i.A2 = 'B1801' and i.C2 = 'HS0009'
+	</select>
+	
+	<select id="getFormulaDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.for_indname,t.for_table,t.for_column 
+		from FORMULA_DETAIL t 
+		where t.for_id = #{formulaId}
+	</select>
+	
+	<select id="getFormulaDatas" parameterType="java.util.Map" resultType="map">
+	   	${sql}
+	</select>
+	
+	<select id="getRationalityTable" parameterType="java.util.Map" resultType="map">
+	    select t.ra_table 
+	    from RATIONALITY_QUERY_TABLE t
+	    where t.ra_taskid = #{taskId} 
+	    and t.ra_perparam = #{perId} 
+	    and ra_type = #{type}
+	</select>
+</mapper>

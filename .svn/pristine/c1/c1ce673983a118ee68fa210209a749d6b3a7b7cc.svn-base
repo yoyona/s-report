@@ -1,0 +1,12 @@
+spring.redis.database=0
+spring.redis.host=127.0.0.1
+#spring.redis.host=172.16.0.120:6380,172.16.0.120:6381,172.16.0.120:6382,172.16.0.120:6383,172.16.0.120:6384,172.16.0.120:6385
+#spring.redis.host=106.37.72.238:6380,106.37.72.238:6381,106.37.72.238:6382,106.37.72.238:6383,106.37.72.238:6384,106.37.72.238:6385
+#spring.redis.password= 
+spring.redis.pool.max-active=8
+spring.redis.pool.max-idle=8
+spring.redis.pool.max-wait=-1
+spring.redis.pool.min-idle=0
+spring.redis.port=6379
+spring.redis.timeout=50000
+spring.redis.expireTime=12

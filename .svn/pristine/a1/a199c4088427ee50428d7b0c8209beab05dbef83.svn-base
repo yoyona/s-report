@@ -1,0 +1,281 @@
+/*
+ * 版权所有 2019 冠新软件。
+ * 保留所有权利。
+ */
+package net.greatsoft.core.service.task;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import net.greatsoft.core.domain.mapper.FormulaMapper;
+
+/**
+ * 合理化建议查询相关
+ * @since 2019-2-1
+ */
+@Service
+public class FormulaService {
+	@Autowired
+	private FormulaMapper formulaMapper;
+	
+	/**
+	 * 查询公式列表
+	 * @param taskId
+	 * @param perId
+	 * @param orgIds
+	 * @param formulaId
+	 * @return
+	 * @since 2019-2-14
+	 */
+	public List<Map<String,Object>> getFormulaList(String taskId,String perId,List<String> orgIds,String formulaId){
+		List<Map<String,Object>> data = new ArrayList<Map<String, Object>>();
+		return data;
+	}
+	
+	/**
+	 * 按选择公式查询核实性说明
+	 * @param type
+	 * @param taskId
+	 * @param perId
+	 * @param orgIds
+	 * @param formulaId
+	 * @param indices
+	 * @return
+	 * @since 2019-2-14
+	 */
+	public List<Map<String,Object>> getFormulaData(String type,String taskId,String perId,List<String> orgIds,String formulaId,List<Map<String,Object>> indices){
+		Map<String,Object> param = new HashMap();
+//		param.put("formulaId", formulaId);
+//		List<Map<String,Object>> indices = formulaMapper.getFormulaDetail(param);
+		Map<String,Object> tables = new HashMap();
+		StringBuffer sbOrgIds  = new StringBuffer();
+		for (int i = 0; i < orgIds.size(); i++) {
+			sbOrgIds.append("','").append(orgIds.get(i));
+		}
+		Map<String, Object> indice = null;
+		String columns = "";
+		String oldColumns = "";
+		for (int i = 0; i < indices.size(); i++) {
+			indice = indices.get(i);
+			if(!tables.containsKey((String)indice.get("FOR_TABLE"))){
+				columns = (String)indice.get("FOR_COLUMN") + " as "+(String)indice.get("FOR_TABLE") + "_" + (String)indice.get("FOR_COLUMN");
+				tables.put((String)indice.get("FOR_TABLE"), columns);
+			}else{
+				oldColumns = (String)tables.get((String)indice.get("FOR_TABLE"));
+				columns = oldColumns + "," + (String)indice.get("FOR_COLUMN") + " as " + (String)indice.get("FOR_TABLE") + "_" +(String)indice.get("FOR_COLUMN");
+				tables.put((String)indice.get("FOR_TABLE"), columns);
+			}
+		}
+		//组织查询指标数据sql
+		StringBuffer sbTable = new StringBuffer();
+		StringBuffer sbOn = new StringBuffer();
+		StringBuffer showColumns = new StringBuffer();
+		String showColumnsFirst = " t0.org_id,t0.org_name,t0.org_level,t0.ORG_ADMINISTRATIVE_CODE,t0.ORG_FILL_TYPE,t0.ORG_CATEGORY,t0.ORG_BUDGET_MANAGEMENT_LEVEL,t0.ORG_HOSPITAL_GRADE";
+		int t = 0;
+		for (String key : tables.keySet()) { 
+		  // System.out.println("Key = " + key); 
+		  columns = (String)tables.get(key);
+		  showColumns.append(",t" + t + "." + columns.replaceAll(",", ",t" + t + "."));
+		  
+		  sbTable.append("( select o.org_level,o.org_id,o.org_name,o.ORG_ADMINISTRATIVE_CODE,o.ORG_FILL_TYPE,o.ORG_CATEGORY,o.ORG_BUDGET_MANAGEMENT_LEVEL,o.ORG_HOSPITAL_GRADE,").append(columns)
+		  		 .append(" from org o")
+		  		 .append(" left join ").append(key).append("@WLZBDATA t on t.userid_ = o.org_id ").append("and ").append("t.bbq_ = '").append(perId).append("'")
+		  		 .append(" where o.org_id in (")
+		  		 .append(sbOrgIds.toString().replaceFirst("',",""))
+		  		 .append("') ) t" + t++);
+		  if(t > 1){
+			  sbTable.append(" on ").append("t").append(t-2).append(".org_id = t").append(t-1).append(".org_id");
+		  }
+		  if(t != tables.keySet().size()){
+			  sbTable.append(" full join ");
+		  }
+		}
+		
+		//格式例如：t0.D6 as IGLKB_B01_D6，最外部查询时将D6 as去掉
+		String[] cols = showColumns.toString().replaceFirst(",", "").split(",");
+		StringBuffer showCol = new StringBuffer();
+		String col = "";
+		for (int i = 0; i < cols.length; i++) {
+			col = cols[i].split("\\.")[1];
+			showCol.append("," + cols[i].split("\\.")[0] + "." + col.split("as")[1].replaceAll(" ", ""));
+		}
+		
+		StringBuffer sql = new StringBuffer();
+		sql.append("select ").append(showColumnsFirst + showCol.toString()).append(" from ").append(sbTable.toString()).append(sbOn.toString());
+		System.out.println(">>>>> " + sql.toString());
+		
+		
+		//组织查询核实性说明sql
+		Map<String,Object> par = new HashMap();
+		par.put("formulaId", formulaId);
+		Map<String,Object> formula = formulaMapper.getFormulaById(par);
+		par.put("type", type);
+		par.put("taskId", taskId);
+		par.put("perId", perId);
+		Map<String,Object> hsTable = formulaMapper.getRationalityTable(par);
+		StringBuffer hsxsm = new StringBuffer();
+		hsxsm.append("select i.userid_,i.E2 from ").append(hsTable.get("RA_TABLE")).append("@WLZBDATA i where i.bbq_ = '").append(perId)
+			.append("' and i.userid_ in (")
+			.append(sbOrgIds.toString().replaceFirst("',","")).append("')")
+			.append(" and i.A2 = '").append(formula.get("FOR_SHEETID")).append("'")
+			.append(" and i.C2 = '").append(formula.get("FOR_FORMULAID")).append("'");
+		
+		//组织最终查询sql语句
+		StringBuffer finalSql = new StringBuffer();
+		String orderby = " order by data1.org_level, data1.org_administrative_code, data1.org_budget_management_level, data1.org_id, data1.org_name";
+		finalSql.append("select * from (")
+				.append(sql.toString())
+				.append(") data1 full join (")
+				.append(hsxsm.toString())
+				.append(") data2 on data1.org_id = data2.userid_")
+				.append(orderby);
+		param.put("sql", finalSql.toString());
+		System.out.println(">>>>> " + finalSql.toString());
+		System.out.println("执行公式数据查询，id为：" + formulaId);
+		List<Map<String, Object>> object = this.formulaMapper.getFormulaDatas(param);
+		return object;
+	}
+	
+	/**
+	 * 导出全部核实性说明
+	 * @param taskId
+	 * @param perId
+	 * @param orgIds
+	 * @param formulaId
+	 * @return
+	 * @since 2019-2-14
+	 */
+	public void exportExcel(String type,String taskId,String perId,List<String> orgIds, HttpServletResponse response){
+		HSSFWorkbook workbook = new HSSFWorkbook();
+		/*// 标题样式
+		HSSFCellStyle styleTitle = createStyleOfTitle(workbook);
+		// 普通单元格样式
+		HSSFCellStyle styleOfLeft = createStyleOfLeft(workbook);
+		// 普通加粗单元格样式
+		HSSFCellStyle styleOfCenter = createStyleOfCenter(workbook);
+		// 边框样式
+		HSSFCellStyle styleOfBorder = createStyleOfBorder(workbook);
+		// 字体加粗居左样式
+		HSSFCellStyle styleCeneterLeft = createStyleOfCeneterLeft(workbook);
+		// 靠右 倾斜
+		HSSFCellStyle styleOfIntanlic = createStyleOfIntanlic(workbook);*/
+		Map<String,Object> map = new HashMap();
+		map.put("type", type);
+		map.put("taskId", taskId);
+		map.put("perId", perId);
+		List<Map<String, Object>> formulas = formulaMapper.getFormulaByType(map);
+		HSSFSheet sheet = null;
+		List<Map<String, Object>> sheetData = null;
+		List<Map<String,Object>> indices = null;
+		String formulaId = "";
+		Map indMap = null;
+		for (int i = 0; i < formulas.size(); i++) {//
+			sheet = workbook.createSheet(i+1+"");
+			Map<String,Object> param = new HashMap();
+			formulaId = (String)formulas.get(i).get("FOR_ID");
+			param.put("formulaId", formulaId);
+			indices = formulaMapper.getFormulaDetail(param);
+			indMap = new HashMap();
+			for (int j = 0; j < indices.size(); j++) {
+				indMap.put(indices.get(j).get("FOR_INDNAME"), indices.get(j).get("FOR_TABLE") + "_" + indices.get(j).get("FOR_COLUMN"));
+			}
+			//获取sheet页显示数据
+			sheetData = getFormulaData(type, taskId, perId, orgIds, formulaId, indices);
+			//固定页头
+			HSSFRow row1 = sheet.createRow(0);
+			HSSFCell cell1 = row1.createCell(1);
+			cell1.setCellValue("基层审核指标");
+			
+			HSSFRow row2 = sheet.createRow(1);
+			HSSFCell cell2 = row2.createCell(1);
+			cell2.setCellValue("金额单位：元");
+			
+			HSSFRow row = null;
+			HSSFCell cell = null;
+			
+			row = sheet.createRow(2);
+			cell = row.createCell(0);
+			cell.setCellValue("序号");	
+			
+			cell = row.createCell(1);
+			cell.setCellValue("单位名称");
+			
+			
+			//循环显示动态指标中文名称
+			for (int j = 0; j < indices.size(); j++) {
+				cell = row.createCell(j+2);
+				cell.setCellValue((String)indices.get(j).get("FOR_INDNAME"));
+				
+			}
+			cell = row.createCell(indices.size() + 2);
+			cell.setCellValue("（基层）请核实");
+			
+			//动态显示数据
+			for (int j = 0; j < sheetData.size(); j++) {
+				row = sheet.createRow(j+3);
+				cell = row.createCell(0);
+				cell.setCellValue(j+1);
+				
+				cell = row.createCell(1);
+				cell.setCellValue((String)sheetData.get(j).get("ORG_NAME"));
+				Object value = null;
+				for (int j2 = 0; j2 < indices.size(); j2++) {
+					cell = row.createCell(j2 + 2);
+					value = sheetData.get(j).get((String)indMap.get((String)indices.get(j2).get("FOR_INDNAME")));
+					cell.setCellValue(String.valueOf(value == null?"":value));
+					if(value == null){
+						cell.setCellValue("");
+					}else{
+						cell.setCellValue(Double.parseDouble(value.toString()));
+					}
+				}
+				
+				cell = row.createCell(indices.size() + 2);
+				cell.setCellValue((String)sheetData.get(j).get("E2"));
+				
+			}
+			
+			//设置自动宽度
+			sheet.autoSizeColumn(0);
+			sheet.autoSizeColumn(1);
+			sheet.setColumnWidth(1, 30*256);
+			//设置动态列自动宽度
+			for (int j = 0; j < indices.size(); j++) {
+				System.out.println(">>>>>>>>>>>>>" + (j+2));
+				sheet.autoSizeColumn(j+2);
+			}
+		}
+		try {
+			String fileName = "审查数据结果";
+			response.setContentType("application/vnd.ms-excel");
+			response.setHeader("Content-disposition", "attachment;filename="+ URLEncoder.encode((((null == fileName) || ("".equals(fileName.trim()))) ? ((new Date().getTime()) + "") : fileName.trim()) + ".xls", "utf-8"));
+			
+			// 获取客户端输出流
+			OutputStream os;
+			os = response.getOutputStream();
+			workbook.write(os);
+			os.flush();
+			// 操作结束，关闭文件
+			os.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+}

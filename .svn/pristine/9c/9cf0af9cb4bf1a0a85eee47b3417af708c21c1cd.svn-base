@@ -1,0 +1,51 @@
+package net.greatsoft.core.service.redis;
+
+import javax.annotation.Resource;
+
+import org.springframework.stereotype.Service;
+
+import net.greatsoft.core.domain.model.system.User;
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.repository.redis.CacheRedisDao;
+
+@Service
+public class CacheUsersService {
+
+	 @Resource
+	 private CacheRedisDao cacheRedisDao;
+	 
+	/**
+	 * 缓存用户信息
+	 * @param users
+	 */
+   public void addOrUpdate(User users){
+	   cacheRedisDao.set(users.getToken(), users);
+   }
+   public void addOrUpdate(String token,Object object){
+	   cacheRedisDao.set(token, object);
+   }
+
+   public UserDto findByToken(String token) {
+		return (UserDto) cacheRedisDao.get(token);
+	}
+   
+   /**
+    * 查询用户信息
+    * @param usersId
+    * @return
+    */
+	public User findByUsersId(String usersId) {
+		return (User) cacheRedisDao.get(usersId);
+	}
+	
+	
+	public void delByToken(String token) {
+		cacheRedisDao.remove(token);
+		
+	}
+	
+	public Object getByToken(String token){
+		Object object = cacheRedisDao.get(token);
+		return object;
+	}
+}

@@ -1,0 +1,613 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TaskExecuteMapper">
+
+	<resultMap type="net.greatsoft.core.domain.model.task.Task" id="taskMap">
+		<id column="task_id" property="taskId"/>
+		<result column="task_orgid" property="orgId"/>
+		<result column="task_name" property="taskName"/>
+		<result column="task_startdate" property="startDate"/>
+		<result column="task_enddate" property="endDate"/>
+		<result column="task_allocation_type" property="allocationType"/>
+		<result column="task_des" property="des"/>
+		<result column="task_type" property="type"/>
+		<result column="task_status" property="status"/>
+		<result column="task_createtime" property="createTime"/>
+		<result column="task_createuserid" property="createUserId"/>
+		<result column="task_audittype" property="auditType"/>
+		<result column="task_orgname" property="orgName"/>
+		<result column="task_proceduresname" property="proceduresName"/>
+		<result column="task_range_startdate" property="rangeStartDate"/>
+		<result column="task_range_enddate" property="rangeEndDate"/>
+		<result column="task_aggregate_type" property="aggregateType"/>
+		<collection property="periods" ofType="net.greatsoft.core.domain.model.task.Period" column="periodId">
+			<id column="aid" property="id"/><!-- 这里的column对应的是下面查询的别名，而不是表字段名 -->
+			<result column="periodId" property="periodId"/><!-- property对应JavaBean中的属性名 -->
+			<result column="periodName" property="periodName"/>
+			<result column="periodDescription" property="periodDescription"/>
+			<result column="startDate" property="startDate"/>
+			<result column="endDate" property="endDate"/>
+			<result column="per_status" property="status"/>
+			<!-- <result column="per_startDate" property="startDate"/>
+			<result column="per_endDate" property="endDate"/>
+			<result column="per_orgid" property="orgId"/> -->
+			<result column="paramName" property="paramName"/>
+		</collection>
+	</resultMap>
+	
+	<select id="findLoginTask" parameterType="java.util.Map" resultMap="taskMap">
+		select 
+			t.task_id,
+			t.task_name,
+			t.task_type,
+			t.task_startdate,
+			t.task_enddate,
+			t.task_orgid,
+			t.task_des,
+			t.task_orgname,
+			t.task_status,
+			t.task_proceduresname,
+			p.per_id as periodId,
+			p.per_name as periodName,
+			p.per_description as periodDescription,
+			p.per_paramname as paramName,
+			p.PER_START_DATE as startDate,
+			p.PER_END_DATE as endDate,
+			p.per_status
+			from task t
+			inner join task_user tu on t.task_id = tu.tu_taskId
+			left join period p on t.task_id = p.per_taskid
+		where
+			 	 t.task_status = '2' 
+			 and tu.tu_userid = #{userId}
+		  	 order by to_number(t.task_id)
+	</select>
+	
+	
+    <!-- 通过用户id来查询对应的任务列表 查看开启的任务 -->
+	<select id="queryTaskListByUserId" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.Task">
+		select t.task_id as taskId,
+		t.task_name as taskName,
+		t.task_type as type,
+		t.task_startdate as startDate,
+		t.task_enddate as endDate,
+		t.task_orgid as orgId,
+		t.task_des as des,
+		t.task_orgname as orgName,
+		t.task_status  as status,
+		t.task_proceduresname as proceduresName
+		from task t
+		inner join task_user tu on t.task_id = tu.tu_taskId
+		where
+		 	 t.task_status = '2' 
+		 and tu.tu_userid = #{userId}
+		 <!-- 所属机构 -->
+		 <if test="orgId != null and orgId != ''">
+		 	and t.task_orgId = #{orgId}
+		 </if>
+		 <!-- 任务类型 -->
+	  	 <if test="type !=null and type != ''">
+	  		and t.task_type = #{type,jdbcType=VARCHAR}
+	  	 </if>
+	  	 <!-- 任务状态 -->
+	  	<if test="status !=null and status != ''">
+	  		and t.task_status<!--  = #{status,jdbcType=VARCHAR} -->
+	  		in 
+	  		<foreach item="item" index = "index" collection="status" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+	  	</if>
+	  	<!-- 任务开始时间和结束时间 -->
+	  	<if test="startDate !=null">
+	  		<![CDATA[
+	  		and t.task_startdate >= #{startDate}
+	  		 ]]> 
+	  	</if>
+	  	<if test="endDate !=null">
+	  		<![CDATA[
+	  		and t.task_enddate <= #{endDate}
+	  		 ]]> 
+	  	</if>
+	  	order by to_number(t.task_id)
+	</select>
+	<!-- 
+		查询指定用户下的进行中的任务,已完成的任务,参数是home
+	 -->
+	<select id="queryTaskListByExcuteStatus" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.Task">
+	    <!-- task_user,task_scope,audit_record,task -->
+	  select t.task_id as taskId,
+		    t.task_name as taskName,
+		    t.task_type as type,
+		    t.task_startdate as startDate,
+		    t.task_enddate as endDate,
+		    t.task_orgid as orgId,
+		    t.task_des as des,
+		    t.task_orgname as orgName,
+		    t.task_status  as status,
+		    t.task_proceduresname as proceduresName
+		    from task t
+		    inner join task_user tu on t.task_id = tu.tu_taskId
+		    inner join audit_record ar on t.task_id = ar.aud_taskid  
+		    inner join task_scope tc on t.task_id = tc.sco_taskid
+		    where 
+		    	t.task_status = '2'  
+		    	and ar.aud_orgid = t.task_orgid 
+		    	and t.task_orgid = tc.sco_orgid
+     			and tu.tu_userid = #{userId}
+       			and ar.aud_status = #{home}
+	    	<!-- 所属机构 -->
+		 <if test="orgId != null and orgId != ''">
+		 	and t.task_orgId = #{orgId}
+		 </if>
+		 <!-- 任务类型 -->
+	  	 <if test="type !=null and type != ''">
+	  		and t.task_type = #{type,jdbcType=VARCHAR}
+	  	 </if>
+	  	 <!-- 任务状态 -->
+	  	<if test="status !=null and status != ''">
+	  		and t.task_status in 
+	  		<foreach item="item" index = "index" collection="status" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+	  	</if>
+	  	<!-- 任务开始时间和结束时间 -->
+	  	<if test="startDate !=null">
+	  		<![CDATA[
+	  		and t.task_startdate >= #{startDate}
+	  		 ]]> 
+	  	</if>
+	  	<if test="endDate !=null">
+	  		<![CDATA[
+	  		and t.task_enddate <= #{endDate}
+	  		 ]]> 
+	  	</if>
+	</select>
+	<select id="findHeaderInfo" parameterType="map" resultType="map">
+		 select t.task_id as "taskId",
+			    t.task_name as "taskName",
+			    t.task_type as "type",
+			    to_char(t.task_startdate, 'yyyy') as "year",
+			    t.task_startdate as "startDate",
+			    t.task_enddate as "endDate",
+			    t.task_orgid as "orgId",
+			    t.task_des as "des",
+			    t.task_orgname as "orgName",
+			    t.task_status  as "status",
+			    t.task_proceduresname as "proceduresName",
+			    p.per_id as "periodId",
+			    p.per_name as "periodName",
+			    a.aud_summary_status as "summaryStatus",
+			    a.aud_status as "audStatus",
+			    p.per_status as "perStatus"
+		    from task t
+		    left join period p on t.task_id = p.per_taskid
+		    left join audit_record a on a.aud_perid = p.per_id
+	    	<where>
+	    		<if test="orgId != null and orgId != ''">
+		  			and a.aud_orgid = #{orgId}
+	  			</if>
+		    	<if test="status != null and status != ''">
+		  			and t.task_status = #{status}
+	  			</if>
+	  			<!-- 任务开始时间和结束时间 -->
+			  	<if test="startDate != null">
+			  		<![CDATA[and t.task_startdate >= #{startDate}]]> 
+			  	</if>
+			  	<if test="endDate != null">
+			  		<![CDATA[and t.task_enddate <= #{endDate}]]> 
+			  	</if>
+			  	<!-- 任务类型 -->
+			  	<if test="type != null and type != ''">
+			  	    and t.task_type = #{type}
+			  	</if>
+			  	<!--报表名称 -->
+			  	<if test="taskName != null and taskName != ''">
+			  		and t.task_name like  #{taskName} || '%'
+			  	</if>
+			  	<!-- 报表年份 -->
+			  	<if test="year != null and year != ''">
+			  		and to_char(task_startdate, 'yyyy') = #{year}
+			  	</if>
+	    	</where>  
+		  	
+	</select>
+	<!-- 调用汇总存储过程 -->
+	<select id="summaryTaskData" statementType="CALLABLE" parameterType="java.util.Map">
+		call ${proceduresName}@wlzbdata(#{uniqueId,mode=IN,jdbcType=VARCHAR},#{perName,mode=IN,jdbcType=VARCHAR},#{code,mode=OUT,jdbcType=INTEGER})
+	</select>
+	<!-- 根据地区查询统计数据 -->
+	<select id="queryProgressByOrgId" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.ProgressDto">
+		    <!-- 根据机构批复后功能修改 -->
+		    select t1.orgId,
+		       t1.orgName,
+		       t1.fillType,
+		       t1.uniqueId,
+		       (t2.submitSum + t2.passSum + t2.noSubmitSum) as allSum,
+		       (t2.submitSum + t2.passSum) as submitSum,
+		       t2.passSum,
+		       t2.noSubmitSum
+		  from (select o.org_id as orgId, o.org_name as orgName,o.org_unique_id as uniqueId,o.org_fill_type as fillType
+		          from org o, audit_record ar
+		         where o.org_id = ar.aud_orgid
+		           and o.org_unique_id = #{uniqueId}
+		           and ar.aud_perid = #{perId}
+		           and ar.aud_taskid = #{taskId}
+		           and o.org_status = '0') t1
+		  full outer join (select sum(submitSum) as submitSum,
+		                          sum(passSum) as passSum,
+		                          sum(noSubmitSum) as noSubmitSum
+		                     from (select nvl(sum(case
+		                                            when t.aud_status = '1' then
+		                                             count(1)
+		                                          end),
+		                                      0) as submitSum,
+		                                  nvl(sum(case
+		                                            when t.aud_status = '0' then
+		                                             count(1)
+		                                          end),
+		                                      0) as passSum,
+		                                  nvl(sum(case
+		                                            when t.aud_status = '2' or t.aud_status = '3' or t.aud_status = '9' then
+		                                             count(1)
+		                                          end),
+		                                      0) as noSubmitSum
+		                             from AUDIT_RECORD t, org o
+		                            where t.aud_orgid = o.org_id
+		                              and t.aud_taskId = #{taskId}
+		                              and t.aud_perid = #{perId}
+		                              and o.org_status = '0'
+		                              and t.aud_orgid not like '%2'
+		                              <!-- and o.org_regionpid = #{uniqueId} -->
+		                              and t.aud_orgid in
+		                                  (  select oh.org_id　from org oh where oh.org_status = '0'
+		                                  	  <!-- 如果是不包含本级单位，那么将本级单位的剔除 -->
+		                                  	  <choose>
+		                                  	  	<when test="AggregateType == 1">
+		                                  	  		and oh.org_fill_type not in('01','030101')
+		                                  	  	</when>
+		                                  	  </choose>	 
+		                                      start with oh.ORG_UNIQUE_ID = #{uniqueId} 
+		                                      connect by prior oh.ORG_UNIQUE_ID = oh.org_subjectionpid)
+		                            group by t.aud_status)) t2
+		    on 1 = 1
+	</select>
+	<select id="getUrgeList" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.ProgressDto">
+		   <!-- select t.aud_orgid as orgId,
+	       o.org_name as orgName,
+	       nvl(case
+	             when t.aud_status = '1' or t.aud_status = '2' or t.aud_status = '3' then
+	              1
+	           end,
+	           0) as submitSum,
+	       nvl(case
+	             when t.aud_status = '0' then
+	              1
+	           end,
+	           0) as passSum,
+	       nvl(case
+	             when t.aud_status = '9' then
+	              1
+	           end,
+	           0) as noSubmitSum
+		  from AUDIT_RECORD t, org_history o
+		 where t.aud_orgid = o.org_id
+		   and t.aud_taskId = #{taskId}
+		   and t.aud_perid = #{perId}
+		   <if test="status !=null and status != ''">
+		   and t.aud_status = #{status}
+		   </if>
+		 start with o.org_id = #{orgId}
+		connect by prior o.org_unique_id = o.org_subjectionpid
+		order by t.aud_status desc -->
+		<!-- 机构批复需要更改sql -->
+		select  t.aud_orgid as orgId,
+	       		o.org_name as orgName,
+	       nvl(case
+	             when t.aud_status = '1' or t.aud_status = '2' or t.aud_status = '3' then
+	              1
+	           end,
+	           0) as submitSum,
+	       nvl(case
+	             when t.aud_status = '0' then
+	              1
+	           end,
+	           0) as passSum,
+	       nvl(case
+	             when t.aud_status = '9' then
+	              1
+	           end,
+	           0) as noSubmitSum
+		  from AUDIT_RECORD t, org o
+		 where t.aud_orgid = o.org_id
+		   and t.aud_taskId = #{taskId}
+		   and t.aud_perid = #{perId}
+		   and o.org_status = '0'
+		   <!-- 如果任务不包含本级单位 -->
+		   <if test="AggregateType != null and AggregateType != ''">
+		   		and o.org_fill_type not in ('01','030101')
+		   </if>
+		   <if test="status !=null and status != ''">
+		   and t.aud_status = #{status}
+		   </if>
+		   and t.aud_orgid not like '%2'
+		   and t.aud_orgid in 
+		   (
+		   	 select oh.org_id from org oh  
+		   	  start with oh.org_subjectionpid = #{uniqueId}
+			connect by prior oh.org_unique_id = oh.org_subjectionpid
+		   )
+		order by t.aud_status desc
+	</select>
+	<!-- 根据填报类型查询统计数据 -->
+	<select id="queryProgressByFillType" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.ProgressDto">
+      	<!-- select sum(submitSum)+sum(passSum) as submitSum,sum(passSum) as passSum,sum(noSubmitSum) as noSubmitSum
+            from( -->
+            <!-- select nvl(sum(case
+                 when t1.aud_status = '1' or t1.aud_status = '2' then
+                  count(1)
+               end),
+           0) as submitSum,
+       nvl(sum(case
+                 when t1.aud_status = '0' then
+                  count(1)
+               end),
+           0) as passSum,
+       nvl(sum(case
+                 when t1.aud_status = '9' then
+                  count(1)
+               end),
+           0) as noSubmitSum
+  from (select t.aud_orgid, t.aud_status
+          from AUDIT_RECORD t, task_scope s
+         where t.aud_orgid = s.sco_orgid
+           and t.aud_taskid = s.sco_taskid
+           and t.aud_taskId = #{taskId}
+           and t.aud_perid = #{perId}) t1
+ inner join (select o.org_id
+               from org_history o
+               <choose>
+               		<when test="fillType == '020202'">
+               			where o.org_fill_type in  ('020202','02020201','02020202')
+               		</when>
+               		<when test="fillType == '020201'">
+               			where o.org_fill_type in  ('020201','02020101','02020102')
+               		</when>
+               		<when test="fillType == '01'">
+               			where o.org_fill_type in ('01','030101') 
+               		</when>
+               		<otherwise>
+               			where o.org_fill_type = #{fillType}
+               		</otherwise>
+               </choose>   
+              start with o.org_unique_id = #{uniqueId}
+             connect by prior o.org_unique_id = o.org_subjectionpid) t2
+    on t1.aud_orgid = t2.org_id
+ group by t1.aud_status -->
+            
+            <!-- union all
+            
+            select nvl(case when t.aud_status = '1' or t.aud_status = '2' then count(1) end,0) as submitSum,
+                   nvl(case when t.aud_status = '0' then count(1) end,0) as passSum,
+                   nvl(case when t.aud_status = '9' then count(1) end,0) as noSubmitSum
+            from AUDIT_RECORD t, org_history o,task_scope s
+            where t.aud_orgid = o.org_id
+            and t.aud_orgid = s.sco_orgid
+            and t.aud_taskid = s.sco_taskid
+            and t.aud_taskId = #{taskId}
+            and t.aud_perid = #{perId}
+            and o.org_id = #{orgId}
+            group by t.aud_status -->
+           <!--  ) -->
+           <!-- 配合机构批复,此sql查询出数据错误,需要重新更换 -->
+           SELECT nvl(sum(case
+                 when t.aud_status = '1' or t.aud_status = '2' then
+                  count(1)
+               end),
+           0) as submitSum,
+       nvl(sum(case
+                 when t.aud_status = '0' then
+                  count(1)
+               end),
+           0) as passSum,
+       nvl(sum(case
+                 when t.aud_status = '9' then
+                  count(1)
+               end),
+           0) as noSubmitSum
+		  FROM AUDIT_RECORD t, ORG O, task_scope tc
+		 WHERE T.AUD_ORGID = O.ORG_ID
+		   and tc.sco_orgid = o.org_id
+		   and tc.sco_taskid = t.aud_taskid
+		   and t.aud_taskId = #{taskId}
+		   and t.aud_perid = #{perId}
+		   and o.org_status in ('0', '1')
+		   <choose>
+               		<when test="fillType == '020202'">
+               			and o.org_fill_type in  ('020202','02020201','02020202')
+               		</when>
+               		<when test="fillType == '020201'">
+               			and o.org_fill_type in  ('020201','02020101','02020102')
+               		</when>
+               		<when test="fillType == '01'">
+               			and o.org_fill_type in ('01','030101') 
+               		</when>
+               		<otherwise>
+               			and o.org_fill_type = #{fillType}
+               		</otherwise>
+               </choose>   
+		   and t.aud_orgid in
+		       (select oh.org_id
+		          from org oh
+		         where oh.org_status = '0'  and substr(oh.org_name, -4) != '直属汇总'
+		         start with oh.org_unique_id = #{uniqueId}
+		        connect by prior oh.org_unique_id = oh.org_subjectionpid)
+		 group by t.aud_status
+    </select>  
+	<select id="queryDicByIds" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.ProgressDto">
+		select t.dic_id as fillType,t.dic_name as fillTypeName from DIC t where t.dic_type = 't5' and (length(t.dic_id) >= 6 or t.dic_id = '01') and t.dic_id not in ('020101','020102') order by to_number(t.dic_order) desc			
+	</select>
+	<!-- 查询统计首页数据 -->
+	<select id="queryHeaderCount" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.HeaderResultDto">
+		select t.aud_status as status,count(1) as count 
+		from AUDIT_RECORD t,task_scope s,users u,task k
+		where u.users_id = #{userId}
+		and s.sco_orgid  in (select o.org_id from org o where o.org_unique_id = u.admin_org_id and o.org_status in ('0','1'))
+		and t.aud_orgid = s.sco_orgid 
+		and s.sco_taskid = k.task_id
+    	and k.task_status != '9'
+    	and k.task_id = t.aud_taskid
+    	<choose>
+    	    <when test="userType == 1">
+    	        and k.TASK_STATUS in ('0','2')
+    	    </when>
+    	    <otherwise>
+    	        and k.TASK_STATUS = '2'
+    	    </otherwise>
+    	</choose>
+    	
+		group by t.aud_status
+	</select>
+	<!-- 查询超级管理员首页数据 -->
+	<select id="queryAllTaskCount" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.HeaderResultDto">
+		select k.task_status as status,count(1) as count 
+	      from task k
+	      where k.task_status != '9'
+	      group by k.task_status
+	</select>
+	<!-- 填报页面数量统计，本区所有填报单位（包括卫计委本级）上报数量 -->
+	<select id="queryStatisticsData" parameterType="java.util.Map" resultType="net.greatsoft.core.web.dto.HeaderResultDto" flushCache="true">
+		<choose>
+			<when test="fillType == '01'">
+				select r.aud_status as status,count(1) as count
+				from  audit_record r
+				left join task_scope s on s.sco_taskid = r.aud_taskid
+				left join org t on r.aud_orgid = t.org_id 
+				where (t.org_subjectionpid = (select o.org_unique_id from org o where o.org_id = #{orgId})
+		    			or t.org_id = #{orgId})
+				and s.sco_orgid = t.org_id 
+				and s.sco_taskid = r.aud_taskid
+				and r.aud_taskid = #{taskId}
+				and r.aud_perid = #{perId}
+				group by r.aud_status
+			</when>
+			<otherwise>
+			select r.aud_status as status,count(1) as count
+			from  audit_record r
+			left join task_scope s on s.sco_taskid = r.aud_taskid
+			left join org t on r.aud_orgid = t.org_id 
+			where 
+			<choose>
+				<when test="AggregateType != null and AggregateType != ''">
+				(t.org_subjectionpid = (select o.org_subjectionpid from org o where o.org_id = #{orgId})
+	    			 and t.org_unique_id != (select o.org_subjectionpid from org o where o.org_id = #{orgId}))
+				</when>
+				<otherwise>
+				(t.org_subjectionpid = (select o.org_subjectionpid from org o where o.org_id = #{orgId})
+	    			or t.org_id = #{orgId} or t.org_unique_id = (select o.org_subjectionpid from org o where o.org_id = #{orgId}))
+				</otherwise>
+			</choose>
+			
+			and s.sco_orgid = t.org_id 
+			and s.sco_taskid = r.aud_taskid
+			and r.aud_taskid = #{taskId}
+			and r.aud_perid = #{perId}
+			group by r.aud_status
+			</otherwise>
+		</choose>
+	</select>
+	<select id="findProgressPercent" parameterType="hashmap" resultType="hashmap">
+
+		select case when (sum(t.submitSum) + sum(t.passSum) + sum(t.noSubmitSum)) = 0 then 0 else  (sum(t.submitSum) + sum(t.passSum)) / (sum(t.submitSum) + sum(t.passSum) + sum(t.noSubmitSum))*100 end as "percent",
+			sum(t.submitSum) + sum(t.passSum) as "front",
+			sum(t.submitSum) + sum(t.passSum) + sum(t.noSubmitSum) as "back"
+               from (select nvl(sum(case
+                                      when t.aud_status = '1' then
+                                       count(1)
+                                    end),
+                                0) as submitSum,
+                            nvl(sum(case
+                                      when t.aud_status = '0' then
+                                       count(1)
+                                    end),
+                                0) as passSum,
+                            nvl(sum(case
+                                      when t.aud_status = '9' then
+                                       count(1)
+                                    end),
+                                0) as noSubmitSum
+                       from AUDIT_RECORD t, org o
+                      where t.aud_orgid = o.org_id
+                        and t.aud_taskId = #{taskId}
+                        and t.aud_perid = #{periodId}
+                        and o.org_status = '0'
+                        and t.aud_orgid in
+                            ( select oh.org_id　from org oh where oh.org_status  = '0'
+                            	and substr(oh.org_name, -4) != '直属汇总'
+                                start with oh.org_subjectionpid = #{uniqueId}
+                                connect by prior oh.ORG_UNIQUE_ID = oh.org_subjectionpid)
+                      group by t.aud_status
+                      ) t
+		  
+	</select>
+	
+	<select id="findHomepageTask" resultMap="taskMap" parameterType="hashmap">
+	select 
+			t.task_id,
+			t.task_name,
+			t.task_type,
+			t.task_startdate,
+			t.task_enddate,
+			t.task_orgid,
+			t.task_des,
+			t.task_orgname,
+			t.task_status,
+			t.task_proceduresname,
+			p.per_id as periodId,
+			p.per_name as periodName,
+			p.per_description as periodDescription,
+			p.per_paramname as paramName,
+			p.PER_START_DATE as startDate,
+			p.PER_END_DATE as endDate,
+			ar.aud_status as per_status
+			from task t
+			inner join task_user tu on t.task_id = tu.tu_taskId
+			left join period p on t.task_id = p.per_taskid
+			left join audit_record ar on p.per_id = ar.aud_perid and t.task_id = ar.aud_taskid
+		where
+			 	 t.task_status = '2' 
+			 and tu.tu_userid = #{userId}
+		  	 <if test="isAgent != '1'">
+				 and ar.aud_orgid = #{uniqueId}
+			 </if>
+		  	 order by to_number(t.task_id), p.per_start_date desc
+	</select>
+
+	<select id="zdySummary" statementType="CALLABLE" parameterType="java.util.Map">
+		call ${procedure}@wlzbdata(#{orgId,mode=IN,jdbcType=VARCHAR}, #{periodId,mode=IN,jdbcType=VARCHAR}, #{orgIds,mode=IN,jdbcType=VARCHAR}, #{code,mode=OUT,jdbcType=INTEGER})
+	</select>
+
+	<select id="findTaskById" parameterType="String" resultMap="taskMap">
+		select
+		t.task_id,
+		t.task_name,
+		t.task_type,
+		t.task_startdate,
+		t.task_enddate,
+		t.task_orgid,
+		t.task_des,
+		t.task_orgname,
+		t.task_status,
+		t.task_proceduresname,
+		p.per_id as periodId,
+		p.per_name as periodName,
+		p.per_description as periodDescription,
+		p.per_paramname as paramName,
+		p.PER_START_DATE as startDate,
+		p.PER_END_DATE as endDate
+		from task t
+		left join period p on t.task_id = p.per_taskid
+		where
+		t.task_id = #{taskId}
+	</select>
+</mapper>

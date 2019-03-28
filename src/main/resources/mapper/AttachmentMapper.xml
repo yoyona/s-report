@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.AttachmentMapper">
+
+	<select id="findUploadFileList"   resultType="net.greatsoft.core.domain.model.task.Attachment">
+		select ATT_ID as id,
+		       ATT_ORGID as orgId,
+		       ATT_CREATE_USERID as createUserId,
+		       ATT_CREATE_TIME as createTime,
+		       ATT_FILE_URL as fileUrl,
+		       ATT_FILE_NAME as fileName,
+		       ATT_STATUS as status,
+		       ATT_INDICATOR_ID,
+		       ATT_YEAR as year,
+		       ATT_CATEGORY as category,
+		       ATT_NOT_ID as notId,
+		       o.org_name as orgName 
+  		from ATTACHMENT t
+  			left join org o on t.att_orgid = o.org_id
+			where t.att_category in ('0', '1', '2')
+			order by t.att_category
+	</select>
+	
+</mapper>

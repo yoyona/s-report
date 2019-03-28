@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.CustomSummaryMapper">
+	<select id="findCustomSummaryByOrgId" parameterType="map" resultType="net.greatsoft.core.domain.model.system.CustomSummary">
+		select t.cus_id as id,
+		t.cus_name as name,
+		t.cus_taskid as taskId,
+		t.cus_periodid as periodId,
+		t.cus_des as des,
+		t.cus_createtime as createTime,
+		t.cus_orgid as orgId
+		from CUSTOM_SUMMARY t where t.cus_orgid = #{orgId}
+		order by t.cus_createtime desc
+	</select>
+</mapper>

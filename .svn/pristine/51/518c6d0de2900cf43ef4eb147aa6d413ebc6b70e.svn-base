@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.RoleScopeMapper">
+	<delete id="deleteRoleScopeByRoleId" parameterType="String">
+		delete from role_scope where role_id = #{roleId}
+	</delete>
+	
+	<insert id="insertRoleScope" parameterType="net.greatsoft.core.domain.model.system.RoleScope">
+		insert into role_scope(role_id,role_id_ed) values(#{roleId},#{roleIdEd})
+	</insert>
+	
+	<select id="query" parameterType="map" resultType="net.greatsoft.core.domain.model.system.RoleScope">
+		select rs.role_id as roleId,rs.role_id_ed as roleIdEd from role_scope rs 
+		<where>
+			<if test="roleId != null and roleId !=''">
+				and role_id = #{roleId}
+			</if>
+		</where>
+	</select>
+</mapper>

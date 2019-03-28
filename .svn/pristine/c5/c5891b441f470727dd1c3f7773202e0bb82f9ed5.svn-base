@@ -1,0 +1,907 @@
+package net.greatsoft.core.service.task;
+
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import net.greatsoft.core.domain.mapper.AuditRecordMapper;
+import net.greatsoft.core.domain.mapper.OrgHistoryMapper;
+import net.greatsoft.core.domain.mapper.OrgMapper;
+import net.greatsoft.core.domain.mapper.TaskExecuteMapper;
+import net.greatsoft.core.domain.mapper.TaskMapper;
+import net.greatsoft.core.domain.mapper.TemplateInfoMapper;
+import net.greatsoft.core.domain.mapper.UserMapper;
+import net.greatsoft.core.domain.model.system.Org;
+import net.greatsoft.core.domain.model.system.OrgHistory;
+import net.greatsoft.core.domain.model.system.User;
+import net.greatsoft.core.domain.model.task.AuditRecord;
+import net.greatsoft.core.domain.model.task.Task;
+import net.greatsoft.core.domain.model.task.Period;
+import net.greatsoft.core.domain.model.task.TemplateInfo;
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.repository.system.OrgHistoryRepository;
+import net.greatsoft.core.repository.system.OrgRepository;
+import net.greatsoft.core.repository.task.TaskRepository;
+import net.greatsoft.core.repository.task.PeriodRepository;
+import net.greatsoft.core.repository.task.TemplateInfoRepository;
+import net.greatsoft.core.service.notice.NoticeService;
+import net.greatsoft.core.web.dto.HeaderResultDto;
+import net.greatsoft.core.web.dto.ProgressDto;
+import net.greatsoft.core.web.dto.ResultDto;
+import net.greatsoft.core.util.NumberUtils;
+import net.greatsoft.core.util.constant.ExecuteConstant;
+import net.greatsoft.core.util.constant.MessageConstant;
+import net.greatsoft.core.util.constant.SystemConstant;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TaskExecuteService {
+	@Autowired
+	private TaskExecuteMapper taskExcuteMapper;
+	
+	@Autowired
+	private TaskMapper taskMapper;
+	
+	@Autowired
+	private TaskRepository taskRepository;
+	
+	@Autowired
+	private AuditRecordMapper auditRecordMapper;
+	
+	@Autowired
+	private TemplateInfoMapper templateInfoMapper;
+	
+	@Autowired
+	private OrgMapper orgMapper;
+	
+	@Autowired
+	private OrgRepository orgRepository;
+	
+	@Autowired
+	private PeriodRepository periodRepository;
+	
+	@Autowired
+	private OrgHistoryMapper orgHistoryMapper;
+	
+	@Autowired
+	private OrgHistoryRepository orgHistoryRepository;
+	
+	@Autowired
+	private NoticeService noticeService;
+	
+	@Autowired
+	private UserMapper userMapper;
+	
+	@Value("${templateIp}")
+	private String templateIp;
+	/**
+	 * 通过用户id查询待填报任务列表
+	 * @param userId
+	 * @return
+	 */
+	public List queryTaskListByUserId	(Map<String,Object> param){
+		List<Task> list = null;
+		if(param.get("home") != null && !"".equals(param.get("home")) && !"null".equals(param.get("home")) && !"undefined".equals(param.get("home"))){
+			list = taskExcuteMapper.queryTaskListByExcuteStatus(param);
+		}else{
+			if (SystemConstant.ADMIN_USER_ID.equals(param.get("userId"))) {
+				Map<String,Object> map =  new HashMap<String,Object>();
+				list = this.taskMapper.findAllTasks(map);
+			} else {
+				list = this.taskExcuteMapper.queryTaskListByUserId(param);
+			}
+		}
+		return list;
+	}
+	
+	/**
+	 * 根据机构id及表期更新审核记录
+	 * @param orgId
+	 * @param periodId
+	 * @return
+	 */
+	public Integer audit(String orgId,String periodId,String status){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", orgId);
+		param.put("perId", periodId);
+		AuditRecord ar = auditRecordMapper.queryAuditRecord(param);
+		ar.setOrgId(orgId);
+		ar.setPerId(periodId);
+		ar.setStatus(status);
+		return this.auditRecordMapper.updateAuditRecord(ar);
+	}
+	
+	/**
+	 * 根据机构id及表期汇总下级数据
+	 * @param orgId
+	 * @param periodId
+	 * @return
+	 */
+	public Map<String,Object> summary(String orgId,String uniqueId,String taskId,String periodId,String userId){
+		Map<String,Object> param = new HashMap<String,Object>();
+		Map<String,Object> resultMap = new HashMap<String,Object>();
+		param.put("auditType", "0");
+		param.put("orgId", orgId);
+		param.put("uniqueId", uniqueId);
+		param.put("perId", periodId);
+		// 由于机构批复需要,需要传入表期id,和机构唯一id
+		param.put("status", SystemConstant.AUDIT_NO_STATUS_SUBMIT);
+		//查询该机构下属机构是否都已上报
+		Integer sum = auditRecordMapper.checkSituationBelow(param);
+		if(sum != 0){
+			resultMap.put("code", 1);
+			resultMap.put("message", "下属机构尚未全部上报,请上报后汇总");
+			return resultMap;
+		}
+		Task task = taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		//查询任务绑定存储过程名称
+		param.put("taskId", taskId);
+		param.put("templateType", SystemConstant.SUMMARY_TEMPLATE_TYPE);
+		TemplateInfo tis = templateInfoMapper.getTemplateByCondition(param);
+		if(tis != null){
+			Period per = periodRepository.findPeriodByPeriodId(Long.valueOf(periodId));
+			param.put("perId", per.getPeriodId());
+			param.put("perName", per.getParamName());
+			param.put("proceduresName", task.getProceduresName());
+			param.put("uniqueId", uniqueId);
+			this.taskExcuteMapper.summaryTaskData(param);
+//			param.put("code", 1);
+			Integer returnCode = (Integer) param.get("code");
+			//汇总成功后更新审核记录的汇总状态
+			if(returnCode == 1){
+				param.clear();
+				param.put("orgId", orgId);
+				param.put("perId", per.getPeriodId());
+				/*param.put("summaryStatus", "1");*/
+				param.put("summaryStatus", ExecuteConstant.CHECK_SUMMARY_STATUS);
+				param.put("summaryUserId", userId);
+				Org o = orgRepository.getOrgById(orgId);
+				//直属单位汇总户，直属汇总后直接将汇总户审核状态改为1已上报
+				if("01".equals(o.getFileType()) && "2".equals(orgId.substring(orgId.length()-1, orgId.length()))){
+					param.put("status", ExecuteConstant.CHECK_STATUS_PASS);
+				}
+				
+				this.auditRecordMapper.updateAuditRecordByParam(param);
+				resultMap.put("code",0);
+				resultMap.put("message", "汇总成功");
+				return resultMap;
+			}
+		}
+		resultMap.put("code",1);
+		resultMap.put("message", "汇总失败");
+		return resultMap;
+	}
+	
+	/**
+	 * 获取任务绑定的模板信息(根据任务,类型,以及机构区分)
+	 * @param taskId  任务的id
+	 * @param templateType 模板的类型
+	 * @param orgId  机构id
+	 * @return
+	 */
+	public TemplateInfo getTemplateInfo(Long taskId,String templateType,String orgId) {
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId", taskId);
+		param.put("templateType", templateType);
+		param.put("orgId", orgId);
+		TemplateInfo templates = this.templateInfoMapper.getTemplateByCondition(param);
+		return templates;
+	}
+
+    /**
+     * 上报
+     * @param orgId
+     * @param perId
+     * @param taskId
+     * @param isSummary
+     * @param userId
+     * @return
+     */
+	@Transactional
+	public ResultDto submit(String orgId, Long perId, Long taskId,String isSummary,String userId) {
+		Task task = this.taskRepository.findTaskByTaskId(taskId);
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", orgId);
+		param.put("uniqueId", orgId);
+		param.put("auditType", task.getAuditType());
+	    // 这儿由于传过来的orgId是唯一id(机构批复后修改方案)
+		// Org org = this.orgRepository.getOrgById(orgId);
+		Org org = this.orgRepository.getOrgByUniqueId(orgId);
+		String subjectionPid = org.getSubjectionPid();
+
+		Org orgP = this.orgRepository.getOrgByUniqueId(subjectionPid);
+		boolean selfCheck = false;
+		if ((SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(task.getAggregateType()) && SystemConstant.ORG_ADMIN_FILL_TYPE.equals(org.getFileType())) || "1".equals(isSummary) && SystemConstant.ORG_ADMIN_FILL_TYPE.equals(org.getFileType())) {
+			selfCheck = true;
+		} else {
+			selfCheck = selfCheck(org, perId, taskId);
+		}
+		if (!selfCheck) {
+			return new ResultDto(ResultDto.CODE_FAIL,"当前填报数据的模版内的审核没有通过,无法上报。审核操作：1.点击“审核”按钮下的“表内表间审核”。2.点击“审核”按钮下的“合理性审核所有表”。3.点击“保存”。4.审核无误后即可上报。",null);
+		} else {
+			// 增加判断,如果用户是主管用户(机构的填报类型是01,就说明是审核用户),把状态修改为主管本机构已上报
+			if (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(org.getFileType()) && !"3".equals(orgId.substring(orgId.length() - 1, orgId.length())) && ! "1".equals(isSummary)) {
+				param.put("status",ExecuteConstant.CHECK_STATUS_ADMIN_SUBMIT);
+			} else {
+				param.put("status",ExecuteConstant.CHECK_STATUS_SUBMIT);
+			}
+			param.put("perId", perId);
+			// 查询历史记录里面的机构id
+			// OrgHistory queryHistoryOrg = this.orgHistoryMapper.queryHistoryOrg(param);
+			param.put("orgId", orgId);
+			param.put("submitUserId", userId);
+			param.put("submitTime", new Date());
+			Integer r = this.auditRecordMapper.updateAuditRecordByParam(param);
+			// 查询汇总用户列表
+			param = new HashMap<String, Object>();
+			// String subjectPid = 
+			if ((org.getSubjectionPid().endsWith("2") || org.getSubjectionPid().endsWith("3")) && orgP != null && SystemConstant.ORG_ADMIN_FILL_TYPE.equals(orgP.getFileType()) ) {
+				param.put("adminOrganizationId", subjectionPid.substring(0, subjectionPid.length() - 1));
+			} else {
+				param.put("adminOrganizationId", subjectionPid);
+			}
+			
+			List<User> users = this.userMapper.searchUser(param);
+			// 消息提醒
+			noticeService.sendMessage(task, org.getSubjectionPid(), org.getName() + MessageConstant.PASS_TO, users, userId, null);
+			return new ResultDto(ResultDto.CODE_SUCCESS,"上报成功",r);
+		}
+	}
+	
+	//将判断自审部分抽出来
+	private boolean selfCheck(Org org,Long perId,Long taskId){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId",taskId);
+		param.put("templateType",org.getFileType());
+		TemplateInfo templateList = this.templateInfoMapper.getTemplateByCondition(param);
+		if (templateList != null) {
+			Period period = this.periodRepository.getPeriodByPeriodId(perId);
+			param.put("templateId", String.valueOf(templateList.getTemplateId().trim()));
+			param.put("orgId", String.valueOf(org.getUniqueId()));
+			param.put("perId", period.getParamName());
+			Integer checkStatus = this.orgMapper.checkStatus(param);
+			if (checkStatus != null && checkStatus == 0) {
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	}
+	/**
+	 * 审核或驳回操作
+	 * @param orgList
+	 * @param perId
+	 * @param taskId
+	 * @param status
+	 * @return
+	 */
+	@Transactional
+	public ResultDto passOrReject(List<Org> orgList, Long perId, Long taskId, String status,String reason,String currentOrgId,String userId) {
+		//查询出任务信息
+		Task task = this.taskRepository.findTaskByTaskId(taskId);
+		List<AuditRecord> auditRecodList = new ArrayList<AuditRecord>();
+		if ("0".equals(status)) {
+			Map<String,Object> param = new HashMap<String,Object>();
+			param.put("auditType",task.getAuditType());
+			//审核通过操作
+			for (int i = 0; i < orgList.size(); i++) {
+				Org org = orgList.get(i);
+				//审核逻辑判断:1.判断下级机构是否上报
+				/*param.put("status", "1");*/
+				param.put("status", ExecuteConstant.CHECK_STATUS_SUBMIT);
+				param.put("orgId", org.getId());
+				param.put("uniqueId",org.getUniqueId());
+				param.put("perId", perId);
+				Integer  count = this.auditRecordMapper.checkSituationBelow(param);
+				if (count > 0) {
+					//说明该机构其下有没有上报的机构,那么不让通过
+					return new ResultDto(ResultDto.CODE_FAIL,org.getName()+":下面有没有上报通过的机构,无法通过",null);
+				} else {
+					//判断是否是汇总机构,然后判断是否汇总,如果没有汇总不让审核通过
+					/*if ("01".equals(org.getFileType())){*/
+					if (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(org.getFileType())){
+						// 是汇总机构,判断是否汇总,需要查询审核记录信息
+						boolean selfCheck = false;
+						/*if ("1".equals(task.getAggregateType())) {*/
+						if (SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(task.getAggregateType())) {
+							selfCheck = true;
+						}else if ("1".equals(org.getId().substring(org.getId().length() - 1, org.getId().length()))) {//全部汇总机构无需判断模板自审状态
+							selfCheck = true;
+						}else {
+							selfCheck = selfCheck(org, perId, taskId);
+						}
+						// selfCheck = true;
+						// boolean selfCheck = true;
+						if (!selfCheck) {
+							return new ResultDto(ResultDto.CODE_FAIL,org.getName()+"的模版内的审核没有通过,请检查后点击通过",null);
+						} else {
+							//审核通过操作
+							AuditRecord audit = new AuditRecord();
+							audit.setPerId(String.valueOf(perId));
+							audit.setOrgId(String.valueOf(org.getId()));
+							audit.setCheckUserId(userId);
+							//如果所选机构是当前登录用户的机构,那么需要自审通过修改状态为2(机构自审通过)
+							// 由于机构批复--用户的机构的id是唯一id 这儿只有通过唯一id获取
+							if (/*currentOrgId.equals(org.getId())*/currentOrgId.equals(org.getUniqueId())) {
+								/*audit.setStatus("2");*/
+								audit.setStatus(ExecuteConstant.CHECK_STATUS_ADMIN_PASS);
+							} else {
+								audit.setStatus(status);
+							}
+							auditRecodList.add(audit);
+						}
+					} else {
+						//需要判断自审是否通过
+						boolean selfCheck = selfCheck(org, perId, taskId);
+						// selfCheck = true;
+						if (!selfCheck) {
+							return new ResultDto(ResultDto.CODE_FAIL,org.getName()+"的模版内的审核没有通过,请检查后点击通过",null);
+						} else {
+							//审核通过操作
+							AuditRecord audit = new AuditRecord();
+							audit.setPerId(String.valueOf(perId));
+							audit.setOrgId(String.valueOf(org.getId()));
+							audit.setStatus(status);
+							audit.setCheckUserId(userId);
+							auditRecodList.add(audit);
+						}
+					}
+				}
+			}
+			if (!auditRecodList.isEmpty()) {
+				this.auditRecordMapper.updateStatusInBatch(auditRecodList);
+				Map<String,Object>  re = new HashMap<String,Object>();
+				re.put("message", "操作成功");
+				re.put("code",ResultDto.CODE_SUCCESS);
+				return new ResultDto(ResultDto.CODE_SUCCESS,"通过操作成功",re);
+			}
+		} else if ("9".equals(status)) {
+			Map<String,Object> param = new HashMap<String,Object>();
+			//驳回逻辑操作
+			for (int i = 0; i < orgList.size(); i++) {
+				Org org = orgList.get(i);
+				// 判断上级机构是是否已经上报
+				param.put("perId", perId);
+				if (org.getSubjectionPid() == null || org.getRegionPid() == null) {
+					Org orgByUniqueId = this.orgRepository.getOrgByUniqueId(org.getUniqueId());
+					org.setRegionPid(orgByUniqueId.getRegionPid());
+					org.setSubjectionPid(orgByUniqueId.getSubjectionPid());
+				}
+				param.put("uniqueId","0".equals(task.getAuditType()) ? org.getRegionPid() : org.getSubjectionPid());
+				
+				AuditRecord auditRecord = this.auditRecordMapper.queryAuditRecord(param);
+				/*if (auditRecord != null && "1".equals(auditRecord.getStatus())) {*/
+				if (auditRecord != null && (ExecuteConstant.CHECK_STATUS_SUBMIT.equals(auditRecord.getStatus()) || ExecuteConstant.CHECK_STATUS_PASS.equals(auditRecord.getStatus()))) {
+					return new ResultDto(ResultDto.CODE_FAIL,org.getName()+"机构的上级机构已经上报或审核通过,不能驳回下级机构",null);
+				} else {
+					//驳回当前机构
+					AuditRecord audit = new AuditRecord();
+					audit.setPerId(String.valueOf(perId));
+					audit.setOrgId(String.valueOf(org.getId()));
+					audit.setReason(reason);
+					audit.setStatus(status);
+					audit.setSubmitTime(null);
+
+					// 驳回的时候增加驳回次数,需要获取之前审核记录
+					Map<String,Object> peeteT = new HashMap<String,Object>();
+					peeteT.put("perId", perId);
+					peeteT.put("orgId", org.getId());
+					AuditRecord queryAuditRecord = this.auditRecordMapper.queryAudit(peeteT);
+					if (queryAuditRecord != null && queryAuditRecord.getChangeTime() != null) {
+						audit.setChangeTime(String.valueOf(Integer.valueOf(queryAuditRecord.getChangeTime())+1));
+					} else{
+						audit.setChangeTime("0");
+					}
+					// 如果驳回的是本机主管机构,那么将主管机构的汇总状态修改为未汇总
+					/*if ("01".equals(org.getFileType())) {*/
+					if (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(org.getFileType())) {
+						/*audit.setSummaryStatus("0");*/
+						audit.setSummaryStatus(ExecuteConstant.CHECK_SUMMARY_STATUS_INIT);
+					}
+					auditRecodList.add(audit);
+					// 如果驳回的是填报机构,或者是基层单位,那么将该填报机构的主管机构的汇总状态修改为未汇总
+					/*if (param.get("orgId") != null) {
+						Org o = this.orgRepository.getOrgByUniqueId(String.valueOf(param.get("orgId")));
+						if (o != null) {
+							AuditRecord audit2 = new AuditRecord();
+							audit2.setPerId(String.valueOf(perId));
+							audit2.setOrgId(o.getId());
+							audit2.setSummaryStatus("0");
+							auditRecodList.add(audit2);
+						}
+					}*/
+					// 无论怎么样只要驳回就会将该机构的上级机构的汇总状态修改为未汇总,这儿考虑到机构批复的原因,所以通过关联审核记录来查询对应的机构历史信息
+					if (param.get("uniqueId") != null) {
+						Org o = orgMapper.queryOrg(param);
+						//OrgHistory orgHistory = this.orgHistoryMapper.queryHistoryOrg(param);
+						if (o != null) {
+							AuditRecord audit2 = new AuditRecord();
+							audit2.setPerId(String.valueOf(perId));
+							audit2.setOrgId(String.valueOf(o.getId()));
+							/*audit2.setSummaryStatus("0");*/
+							audit2.setSummaryStatus(ExecuteConstant.CHECK_SUMMARY_STATUS_INIT);
+							auditRecodList.add(audit2);
+						}
+					}
+					// 发送站内消息
+					// 查询机构用户数据
+					param.clear();
+					param.put("adminOrganizationId", org.getUniqueId());
+					List<User> users = this.userMapper.searchUser(param);
+					this.noticeService.sendMessage(task, org.getId(), MessageConstant.REJECT_MESSAGE + reason, users, userId, null);
+				}
+			}
+			if (!auditRecodList.isEmpty()) {
+				this.auditRecordMapper.updateStatusInBatch(auditRecodList);
+				Map<String,Object>  re = new HashMap<String,Object>();
+				re.put("message", "操作成功");
+				re.put("code",ResultDto.CODE_SUCCESS);
+				return new ResultDto(ResultDto.CODE_SUCCESS,"操作成功",re);
+			}
+		}
+		return new ResultDto(ResultDto.CODE_FAIL,"操作失败",null);
+	}
+	/**
+	 * 获取模板链接
+	 * @param taskId
+	 * @param orgId
+	 * @param periodId
+	 * @param isSummary
+	 * @return
+	 */
+	public ResultDto getTemplateUrl(Long taskId, String orgId, Long periodId, String isSummary,String readOnly) {
+		Map<String,Object>  r = new HashMap<String,Object>();
+		Map<String,Object>  param = new HashMap<String,Object>();
+ 		//获取机构信息 这儿由于机构批复的关系,改为从历史记录表里面获取必要的机构数据
+		Org org = orgRepository.getOrgById(orgId);
+		//OrgHistory orgHistoryByOrgId = orgHistoryRepository.getOrgHistoryByOrgId(orgId));
+		// 获取填报类型
+		String templateType = org.getFileType();
+		//获取机构唯一id
+		String uniqueId = org.getUniqueId();
+		param.put("uniqueId", uniqueId);
+		// 获取表期对象
+		Period period = this.periodRepository.findPeriodByPeriodId(periodId);
+		//获取审核记录 需要返回给前台
+		param.put("orgId", orgId);
+		param.put("perId",periodId);
+		
+		//亿信华辰服务器按省分流时查询不同省对应的服务器地址
+		Map temMap = new HashMap();
+		if(org.getAdministrativeCode() == null){
+			return new ResultDto(ResultDto.CODE_FAIL, "该机构缺少行政区划代码，请在人员管理系统中修改机构信息",null);
+		}
+		temMap.put("postalCode", org.getAdministrativeCode().substring(0, 2));
+		temMap.put("taskId", taskId);
+		templateIp = orgMapper.getTemplateIp(temMap);
+		if(templateIp == null){
+			return new ResultDto(ResultDto.CODE_FAIL, "该省对应模板地址未配置，请联系管理员",null);
+		}
+		AuditRecord audiRecord = this.auditRecordMapper.queryAuditRecord(param);
+		//首先判断是否是汇总的操作
+		if ("0".equals(isSummary)) {
+			//审核和填报的模板页面
+			//判断填报类型是否是01
+			/*if ("01".equals(templateType)) {*/
+			if (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(templateType) && !"3".equals(orgId.substring(orgId.length()-1, orgId.length()))) {
+				//需要准备两套模板
+				//汇总模板
+				isSummary = "100";
+				Map<String,Object>  paramT = new HashMap<String,Object>();
+				paramT.put("taskId", taskId);
+				paramT.put("templateType", SystemConstant.SUMMARY_TEMPLATE_TYPE);
+				TemplateInfo template  = this.templateInfoMapper.getTemplateByCondition(paramT);
+				if (template == null) {
+					return new ResultDto(ResultDto.CODE_FAIL, "审核汇总模板不能为空!",null);
+				} else {
+					String url = getTemplateUrl(template.getTemplateId(),uniqueId,readOnly,period.getParamName(),taskId,isSummary);
+					r.put("url2", url);
+				}
+				paramT.put("templateType", templateType);
+				template  = this.templateInfoMapper.getTemplateByCondition(paramT);
+				if (template == null){
+					return new ResultDto(ResultDto.CODE_FAIL, "审核模板不能为空",null);
+				} else {
+					/*if (audiRecord != null && "9".equals(audiRecord.getStatus())) {*/
+					if (audiRecord != null && ExecuteConstant.CHECK_STATUS_INIT.equals(audiRecord.getStatus())) {	
+						// 未上报
+						if ("1".equals(readOnly)) {
+							//说明是通过审核界面进入 模板不可编辑
+							String url = getTemplateUrl(template.getTemplateId(),uniqueId,"1",period.getParamName(),taskId,"0");
+							r.put("url", url);
+						} else {
+							String url = getTemplateUrl(template.getTemplateId(),uniqueId,"0",period.getParamName(),taskId,"0");
+							r.put("url", url);
+						}
+						
+					} else if (audiRecord != null) {
+						String url = getTemplateUrl(template.getTemplateId(),uniqueId,"1",period.getParamName(),taskId,"0");
+						r.put("url", url);
+					} else {
+						//如果进入这儿说明审核记录为空
+						return new ResultDto(ResultDto.CODE_FAIL, "该机构缺乏审核记录信息,请重新选择任务表期再进行尝试,如果再次提示此消息,请联系冠新工作人员",null);
+					}
+					
+				}
+			} else {
+				isSummary = "0";
+				/*if(audiRecord != null && "9".equals(audiRecord.getStatus())){*/
+				if(audiRecord != null && ExecuteConstant.CHECK_STATUS_INIT.equals(audiRecord.getStatus())){
+					//未上报
+					Map<String,Object>  paramT = new HashMap<String,Object>();
+					paramT.put("taskId", taskId);
+					paramT.put("templateType", templateType);
+					TemplateInfo template  = this.templateInfoMapper.getTemplateByCondition(paramT);
+					if (template == null) {
+						return new ResultDto(ResultDto.CODE_FAIL, "上报模板不能为空",null);
+					} else {
+						if ("1".equals(readOnly)) {
+							//说明是通过审核界面进入,那么所有的模板都是不可读的,除了本机机构的模板,这时候的本机机构已经有分支进来了
+							String url = getTemplateUrl(template.getTemplateId(),uniqueId,"1",period.getParamName(),taskId,isSummary);
+							r.put("url", url);
+						} else {
+							String url = getTemplateUrl(template.getTemplateId(),uniqueId,"0",period.getParamName(),taskId,isSummary);
+ 							r.put("url", url);
+						}
+						
+					}
+				}else if (audiRecord != null) {
+					//已经上报,或者通过
+					Map<String,Object>  paramT = new HashMap<String,Object>();
+					paramT.put("taskId", taskId);
+					paramT.put("templateType", templateType);
+					TemplateInfo template  = this.templateInfoMapper.getTemplateByCondition(paramT);
+					if (template == null) {
+						return new ResultDto(ResultDto.CODE_FAIL, "上报模板不能为空",null);
+					} else {
+						String url = getTemplateUrl(template.getTemplateId(),uniqueId,"1",period.getParamName(),taskId,isSummary);
+						r.put("url", url);
+					}
+				} else {
+					//如果进入这儿说明审核记录为空
+					return new ResultDto(ResultDto.CODE_FAIL, "该机构缺乏审核记录信息,请重新选择任务表期再进行尝试,如果再次提示此消息,请联系冠新工作人员",null);
+				}
+			}
+		} else {
+			//汇总的模板
+			
+			//汇总只有一套模板,模板类型是100
+			Map<String,Object>  paramT = new HashMap<String,Object>();
+			paramT.put("taskId", taskId);
+			paramT.put("templateType", SystemConstant.SUMMARY_TEMPLATE_TYPE);
+			TemplateInfo template  = this.templateInfoMapper.getTemplateByCondition(paramT);
+			if (template == null){
+				return new ResultDto(ResultDto.CODE_FAIL, "汇总模板不能为空",null);
+			} else {
+				String url = getTemplateUrl(template.getTemplateId(),uniqueId,readOnly,period.getParamName(),taskId,isSummary);
+				r.put("url", url);
+			}
+		}
+		r.put("aduitRecord", audiRecord);
+		//增加返回当前机构统计信息
+//		List<HeaderResultDto> statisticsData = this.queryStatisticsData(taskId.toString(), periodId.toString(), orgId);
+//		r.put("statistic", statisticsData);
+		return new ResultDto(ResultDto.CODE_SUCCESS, "操作成功",r);
+	}
+
+	/**
+	 * 拼接模板url
+	 * 
+	 * @param templateId 模板id
+	 * @param readOnly   是否可读,0是可读 1是不可读
+	 * @param periodName 表期名字
+	 * @param taskId     任务id
+	 * @return
+	 */
+	private String getTemplateUrl(String templateId, String uniqueId, String readOnly, String periodName, Long taskId,
+			String isSummary) {
+		String namespace = "id="+uniqueId+"&pw=wlzb123&target=task";
+		if (!"0".equals(isSummary) && isSummary != null && !"100".equals(isSummary)) {
+			// 汇总的模板的永远是不可编辑的
+			return templateIp + namespace + "&task=" + templateId + "&bbq=" + periodName + "&userid=" + uniqueId
+					+ "&btype=0&curbbhid=" + uniqueId + "&forcelogin=true&readonly=true";
+		} else if("100".equals(isSummary)) {
+			//审核页面汇总模板
+			return templateIp + namespace + "&task=" + templateId + "&bbq=" + periodName + "&userid=" + uniqueId
+					+ "&btype=0&curbbhid=" + uniqueId + "&forcelogin=true&readonly=true";
+
+		}else if (!"".equals(readOnly) && "0".equals(isSummary)) {
+			// 审核,填报的模板
+			if ("0".equals(readOnly)) {
+				// 可读(填报的模板)
+				return templateIp + namespace + "&task=" + templateId + "&bbq=" + periodName + "&userid=" + uniqueId
+						+ "&btype=0&curbbhid=" + uniqueId + "&forcelogin=true&readonly=false";
+			} else {
+				// 不可读(审核的模板)
+				return templateIp + namespace + "&task=" + templateId + "&bbq=" + periodName + "&userid=" + uniqueId
+						+ "&btype=0&curbbhid=" + uniqueId + "&forcelogin=true&readonly=true";
+			}
+		}
+		return null;
+        /*
+        精简的方法,为了防止出错所以不加
+        String namespace = templateIp + "id=" +uniqueId
+				+"&pw=wlzb123&target=task&task="
+				+ templateId + "&bbq=" + periodName + "&userid=" + uniqueId
+				+ "&btype=0&curbbhid=" + uniqueId + "&forcelogin=true&readonly=";
+		if ((!"0".equals(isSummary) && isSummary != null && !"100".equals(isSummary)) || "100".equals(isSummary)) {
+			// 汇总的模板的永远是不可编辑的
+			namespace += "true";
+		} else if (!"".equals(readOnly) && "0".equals(isSummary)) {
+			 namespace += "0".equals(readOnly) ? "false" : "true";;
+		}
+		return namespace;
+         */
+	}
+	
+	/**
+	 * 查询传入地区的卫计委机构，并返回机构树
+	 * @param areaId
+	 * @return
+	 */
+	public Org queryOrgsByAreaId(String areaId){
+		List<Org> orgWjw = orgRepository.getOrgByAreaId(areaId+"%");
+		return orgWjw.get(0);
+	}
+	/**
+	 * 通过填报类型汇总数据
+	 * @param taskId
+	 * @param perId
+	 * @return
+	 */
+	public Map<String,Object> queryProgressByFillType(String taskId,String perId,String orgId,String uniqueId){
+		Map<String,Object> param = new HashMap<String,Object>();
+		//查询类型为01级编码为6位的填报类型
+		List<ProgressDto> pros = taskExcuteMapper.queryDicByIds();
+		Integer orgSum = 0;
+		Integer submitOrgSum = 0;
+		List<ProgressDto> pro = new ArrayList<ProgressDto>();
+		Task task = taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		String aggregateType = task.getAggregateType();
+		
+		/**
+		 * 城市社区 是以020201开头的填报类型
+		 * 乡镇卫生院 是以020202开头的填报类型
+		 * 主管部门 是01 或者是030101的填报类型
+		 */
+		for (int i = 0; i < pros.size(); i++) {
+			String fillType = pros.get(i).getFillType();
+			if ("02020202".equals(fillType) || "02020201".equals(fillType) ||  "02020102".equals(fillType) || "02020101".equals(fillType) ||  "030101".equals(fillType)) {
+				continue;
+			}
+			pro.add(pros.get(i));
+		}
+		for (int i = 0; i < pro.size(); i++) {
+//			String fillType = pro.get(i).getFillType();
+			param.put("taskId", taskId);
+			param.put("perId", perId);
+			param.put("orgId", orgId);
+			param.put("uniqueId", uniqueId);
+			param.put("fillType", pro.get(i).getFillType());
+			/*if ("01".equals(pro.get(i).getFillType()) && "1".equals(aggregateType)) {*/
+			if (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(pro.get(i).getFillType()) && SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(aggregateType)) {
+				continue;
+			}
+			List<ProgressDto> list = taskExcuteMapper.queryProgressByFillType(param);
+			Integer passSum = list.get(0).getPassSum();
+			Integer submitSum = list.get(0).getSubmitSum();
+			Integer noSubmitSum = list.get(0).getNoSubmitSum();
+			pro.get(i).setPassSum(passSum);
+			pro.get(i).setSubmitSum(submitSum);
+			pro.get(i).setNoSubmitSum(noSubmitSum);
+			orgSum = orgSum + passSum + submitSum + noSubmitSum;
+			submitOrgSum = submitOrgSum + pro.get(i).getSubmitSum() + passSum;
+		}
+		Map<String,Object> result = new HashMap<String,Object>();
+		result.put("orgSum", orgSum);//机构数
+		result.put("ratio", orgSum == 0 ? "0" :/*submitOrgSum/orgSum*100*/ NumberUtils.div(Double.valueOf(submitOrgSum),Double.valueOf(orgSum),4)*100);//上报比例
+		result.put("pros", pro);
+		return result;
+	}
+
+	/**
+	 * 查询任务执行进度
+	 * @param orgId
+	 * @param taskId
+	 * @param perId
+	 * @return
+	 */
+	public Map<String, Object> progress(String orgId,String taskId,String perId,String status,String uniqueId,String areaId,Integer pageNo,Integer pageSize){
+		Map<String,Object> param = new HashMap<String,Object>();
+		Task task = taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		if(orgId == null || "".equals(orgId)){
+			// Task task = taskRepository.getOne(taskId);
+			orgId = task == null ? null : task.getOrgId();
+		}
+		param.put("orgId", orgId);
+		param.put("taskId", taskId);
+		param.put("perId", perId);
+		param.put("status", status);
+		param.put("uniqueId", uniqueId);
+		param.put("areaId", areaId);
+		//List<Org> orgs = orgRepository.getOrgsBySubjectionPid(orgId);
+		List<Org> orgs = orgMapper.getOrgsByPid(param);
+		param.put("orgs", orgs);
+		List<ProgressDto> list = new ArrayList<ProgressDto>();
+		for (int i = (pageNo-1) * pageSize; i < (orgs.size() < pageSize*pageNo?orgs.size():pageSize*pageNo); i++) {
+			Map<String,Object> param1 = new HashMap<String,Object>();
+			param1.put("orgId", orgs.get(i).getId());
+			param1.put("taskId", taskId);
+			param1.put("perId", perId);
+			param1.put("uniqueId", orgs.get(i).getUniqueId());
+			// 判断是否是不包含本级单位
+			// SystemConstant.TASK_AGGREGATE_TYPE_NOT
+			/*if ("1".equals(task.getAggregateType()) && (orgs.get(i).getFileType().equals("01") || orgs.get(i).getFileType().equals("030101") )) {*/
+			if (SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(task.getAggregateType()) && (SystemConstant.ORG_ADMIN_FILL_TYPE.equals(orgs.get(i).getFileType()) || orgs.get(i).getFileType().equals("030101") )) {
+				/*param1.put("AggregateType", "1");*/
+				param1.put("AggregateType", SystemConstant.TASK_AGGREGATE_TYPE_NOT);
+			}
+			List<ProgressDto> l = taskExcuteMapper.queryProgressByOrgId(param1);
+			list.addAll(l);
+		}
+		Map<String, Object> result = new HashMap<String, Object>();
+		result.put("pageNo", pageNo);//第几页
+		result.put("pageSize",pageSize);//一页多少数据
+		result.put("total", orgs.size());//总条数
+		result.put("rows", list);
+		return result;
+	}
+	/**
+	 * 查询
+	 * @param orgId
+	 * @param taskId
+	 * @param perId
+	 * @param pageNo
+	 * @param pageSize
+	 * @return
+	 */
+	public List<ProgressDto> urge(Map<String,Object> map){
+		// 如果任务是不包含本级单位的话，那么不需要显示本级的结果
+		String taskId = (String) map.get("taskId");
+		if (taskId != null ) {
+			Task task = this.taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+			/*if (task != null && "1".equals(task.getAggregateType())) {*/
+			if (task != null && SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(task.getAggregateType())) {
+				/*map.put("AggregateType", "1");*/
+				// SystemConstant.TASK_AGGREGATE_TYPE_NOT
+				map.put("AggregateType", SystemConstant.TASK_AGGREGATE_TYPE_NOT);
+			}
+		}
+		List<ProgressDto> l = taskExcuteMapper.getUrgeList(map);
+		return l;
+	}
+	
+	/**
+	 * 统计任务数量状态
+	 * @param userId
+	 * @return
+	 */
+	public List<HeaderResultDto> queryHeaderCount(String userId,Integer userType){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("userId", userId);
+		param.put("userType", userType);
+		List<HeaderResultDto> list = null;
+		if("1".equals(userId)){
+			list = taskExcuteMapper.queryAllTaskCount(param);
+		}else{
+			list = taskExcuteMapper.queryHeaderCount(param);
+		}
+		return list;
+	}
+	
+	/**
+	 * 统计填报单位所在地区任务填报数量
+	 * @param userId
+	 * @return
+	 */
+	public Map<String,Object> queryStatisticsData(String taskId,String perId,String orgId){
+		// 通过机构id拿到机构的填报类型 这儿由于机构批复的原因,查询历史数据
+		// Org org = this.orgRepository.getOrgById(orgId);
+		Map<String,Object> result = new HashMap<>();
+		//OrgHistory orgHistory = this.orgHistoryRepository.getOrgHistoryByOrgId(Long.valueOf(orgId));
+		Org org = this.orgRepository.getOrgByOrgId(orgId);
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("taskId", taskId);
+		param.put("perId", perId);
+		param.put("orgId", orgId);
+		param.put("fillType", org.getFileType());
+		// 判断任务是否是包含本级单位
+		Task task = this.taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		/*if (task.getAggregateType() != null && task.getAggregateType().equals("1")) {
+			param.put("AggregateType", "1");
+			result.put("AggregateType", "1");
+		} else {
+			result.put("AggregateType", "0");
+		}*/
+		if (task.getAggregateType() != null && SystemConstant.TASK_AGGREGATE_TYPE_NOT.equals(task.getAggregateType())) {
+			param.put("AggregateType", SystemConstant.TASK_AGGREGATE_TYPE_NOT);
+			result.put("AggregateType", SystemConstant.TASK_AGGREGATE_TYPE_NOT);
+		} else {
+			result.put("AggregateType", SystemConstant.TASK_AGGREGATE_TYPE);
+		}
+		List<HeaderResultDto> list = null;
+		list = taskExcuteMapper.queryStatisticsData(param);
+		
+		result.put("list", list);
+		
+		return result;
+	}
+	/**
+	 * 
+	 * @return
+	 */
+	public List<Map<String, Object>> getMapData(Map<String, Object> map) {
+		return this.auditRecordMapper.countByProvince(map);
+	}
+
+	/**
+	 * 报表任务查询
+	 * @param map
+	 * @return
+	 */
+	public List<Map<String, Object>> findHeaderInfo(Map<String, Object> map) {
+		return this.taskExcuteMapper.findHeaderInfo(map);
+	}
+
+	/**
+	 * 查询登录用户任务信息
+	 * @param param
+	 * @return
+	 */
+	public List<Task> findLoginTask(Map<String, Object> param) {
+		return this.taskExcuteMapper.findLoginTask(param);
+	}
+	
+
+	/**
+	 * 查询填报进度百分比
+	 * @param map
+	 * @return
+	 */
+	public Map<String, Object> findProgressPercent(Map<String, Object> map) {
+		if(map.get("taskId") == null || map.get("periodId") == null || map.get("taskId").equals("null") || map.get("periodId").equals("null")) {
+			map.put("front", 0);
+			map.put("back", 0);
+			map.put("percent", 0);
+			return map;
+		}
+		return this.taskExcuteMapper.findProgressPercent(map);
+	}
+	
+	/**
+	 * 查询首页数据
+	 * @param map
+	 * @return
+	 */
+	public List<Task> findHomepageTask(Map<String, Object> map) {
+		return this.taskExcuteMapper.findHomepageTask(map);
+	}
+
+	/**
+	 * 自定义汇总
+	 * @param map
+	 */
+	public Integer zdySummary(Map<String, Object> map) {
+		Integer integer = this.taskExcuteMapper.zdySummary(map);
+		return integer;
+	}
+
+	/**
+	 * 查询单个任务对象
+	 * @param taskId
+	 * @return
+	 */
+	public Task findTaskById(String taskId) {
+		return this.taskExcuteMapper.findTaskById(taskId);
+	}
+}

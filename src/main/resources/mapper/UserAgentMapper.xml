@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.UserAgentMapper">
+	<!-- 批量导入 -->
+	<insert id="saveUserAgentBatch" parameterType="java.util.List">
+		insert all 
+	    <foreach collection="list" item="item" index="index" >
+	     into user_agent
+	    	(agent_user_id,agent_org_id)
+	    	values(
+   			#{item.userId,jdbcType=VARCHAR},
+   			#{item.orgId,jdbcType=VARCHAR}
+	    	)		
+	    </foreach>
+	    select * from dual 
+	</insert>
+	<delete id="deleteUserAgentByUserId" parameterType="String">
+		delete from user_agent where agent_user_id = #{userId}
+	</delete>
+</mapper>

@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.AuditRecordMapper">
+	<select id="getCountByTaskId" parameterType="long" resultType="Integer">
+		select count(1)
+			  from audit_record a
+			 inner join period p
+			    on a.aud_perid = p.per_id
+			 inner join task t
+			    on p.per_taskid = t.task_id
+			 where t.task_id = #{taskId}
+	</select>
+	<select id="queryAuditRecord" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.AuditRecord">
+	    select  t.aud_id 			as id,
+			    t.aud_perid 		as perId,
+			    t.aud_orgid 		as orgId,
+			    t.aud_status 		as status,
+			    t.aud_submit_userid as submitUserId,
+			    t.aud_submit_time   as submitTime,
+			    t.aud_check_userid  as checkUserId,
+			    t.aud_check_time 	as checkTime,
+			    t.aud_reason 		as reason,
+			    t.aud_summary_status as summaryStatus,
+			    t.aud_taskid 		as taskId,
+			    t.aud_changetime 	as changeTime
+		from audit_record t,org oh
+			where t.aud_orgid = oh.org_id  
+				and t.aud_perid = #{perId} 
+				and oh.org_unique_id = #{uniqueId}
+		   		<!--and oh.org_status in ('0', '1')-->
+		<!-- 在执行批复后,审核记录的机构信息也被修改历史记录里面的机构id信息,所以这儿需要通过历史记录的表来获取审核记录 -->
+	</select>
+	<!-- 此方法为了应付之前的查询审核记录的方法,之前的方法关联历史机构信息,此方法用于接替之前的方法 -->
+	<select id="queryAudit" parameterType="map" resultType="net.greatsoft.core.domain.model.task.AuditRecord">
+			select  t.aud_id 			as id,
+			    t.aud_perid 		as perId,
+			    t.aud_orgid 		as orgId,
+			    t.aud_status 		as status,
+			    t.aud_submit_userid as submitUserId,
+			    t.aud_submit_time   as submitTime,
+			    t.aud_check_userid  as checkUserId,
+			    t.aud_check_time 	as checkTime,
+			    t.aud_reason 		as reason,
+			    t.aud_summary_status as summaryStatus,
+			    t.aud_taskid 		as taskId,
+			    t.aud_changetime 	as changeTime
+		from audit_record t
+			where 	t.aud_orgid = #{orgId}
+				and t.aud_perid = #{perId} 
+	</select>
+	<!-- 修改审核记录信息 -->
+	<update id="updateAuditRecordByParam" parameterType="hashmap">
+		update audit_record 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="status != null and status != ''">aud_status = #{status},</if>
+			<if test="submitUserId != null and submitUserId != ''">aud_submit_userid = #{submitUserId},</if>
+			<if test="submitTime != null">aud_submit_time = #{submitTime},</if>
+			<if test="checkUserId != null and checkUserId != ''">aud_check_userid = #{checkUserId},</if>
+			<if test="checkTime != null">aud_check_time = #{checkTime},</if>
+			<if test="reason != null and reason != ''">aud_reason = #{reason},</if>
+			<if test="summaryStatus != null and summaryStatus != ''">aud_summary_status = #{summaryStatus},</if>
+			<if test="changeTime != null and changeTime != ''">aud_changetime = #{changeTime},</if>
+			<if test="summaryUserId != null and summaryUserId != ''">aud_summary_userid = #{summaryUserId},</if>
+		</trim>
+		where aud_perid = #{perId} and aud_orgid = #{orgId} 
+	</update>
+	<!-- 修改审核记录信息 -->
+	<update id="updateAuditRecord" parameterType="net.greatsoft.core.domain.model.task.AuditRecord">
+		update audit_record 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="perId != null and perId != ''">aud_perid = #{perId},</if>
+			<if test="orgId != null and orgId != ''">aud_orgid = #{orgId},</if>
+			<if test="status != null and status != ''">aud_status = #{status},</if>
+			<if test="submitUserId != null and submitUserId != ''">aud_submit_userid = #{submitUserId},</if>
+			<if test="submitTime != null">aud_submit_time = #{submitTime},</if>
+			<if test="checkUserId != null and checkUserId != ''">aud_check_userid = #{checkUserId},</if>
+			<if test="checkTime != null">aud_check_time = #{checkTime},</if>
+			<if test="reason != null and reason != ''">aud_reason = #{reason},</if>
+			<if test="taskId != null and taskId != ''">aud_taskid = #{taskId},</if>
+			<if test="changeTime != null and changeTime != ''">aud_changetime = #{changeTime},</if>
+		</trim>
+		where aud_id = #{id}
+	</update>
+	<!-- 获取某个机构下面的审核记录的总体情况 -->
+	<select id="checkSituationBelow" parameterType="map" resultType="Integer" flushCache="true">
+		<!-- 因为机构批复的缘故,需要修改该sql -->
+		<!-- <choose>
+			<when test="auditType == '0'">
+			select count(1)
+				  from audit_record ar, org oh
+				 where ar.aud_orgid = oh.org_id
+				   and ar.aud_perid = #{perId}
+				   and ar.aud_status = #{status}
+				 start with oh.org_regionpid = #{uniqueId}
+				connect by prior oh.org_unique_id = oh.org_regionpid
+			</when>
+			<otherwise>
+				select count(1)
+				  from audit_record ar, org oh
+				 where ar.aud_orgid = oh.org_id
+				   and ar.aud_perid = #{perId}
+				   and ar.aud_status = #{status}
+				 start with oh.org_subjectionpid = #{uniqueId}
+				connect by prior oh.org_unique_id = oh.org_subjectionpid
+			</otherwise>
+		</choose> -->
+		 select count(1) from AUDIT_RECORD ar
+		 where ar.aud_perid = #{perId}
+		 and ar.aud_status = #{status}
+		 and ar.aud_orgid in (
+				 select oh.org_id from org oh where oh.org_status = '0' and  oh.org_is_cancel != '1'
+				 start with oh.org_regionpid = #{uniqueId}
+		        connect by prior oh.org_unique_id = oh.org_regionpid)
+	</select>
+	<delete id="deleteAuditRecordByTaskId" parameterType="Long">
+		delete from audit_record where aud_taskid = #{taskId}
+	</delete>
+	<delete id="deleteAuditRecordByOrgId" parameterType="map">
+		delete from audit_record where aud_orgid = #{orgId}
+	</delete>
+	<insert id="insertAuditRecordBatch" parameterType="java.util.List">
+		INSERT INTO audit_record(  
+            aud_id,
+            aud_perid,
+            aud_orgid,
+            aud_status,
+            aud_submit_userid,
+            aud_submit_time,
+            aud_check_userid,  
+            aud_check_time,
+            aud_reason,
+            aud_summary_status,
+            aud_taskid,
+            aud_changetime
+          )  
+          select seq_audit_record.nextval,cd.* from(  
+          <foreach collection="list" item="item" index="index" separator="union all">  
+              select  
+                #{item.perId,jdbcType=VARCHAR},  
+                #{item.orgId,jdbcType=VARCHAR},  
+                #{item.status,jdbcType=VARCHAR},  
+                #{item.submitUserId,jdbcType=VARCHAR},  
+                #{item.submitTime,jdbcType=DATE},  
+                #{item.checkUserId,jdbcType=VARCHAR},  
+                #{item.checkTime,jdbcType=DATE},  
+                #{item.reason,jdbcType=VARCHAR},  
+                #{item.summaryStatus,jdbcType=VARCHAR},
+                #{item.taskId,jdbcType=VARCHAR},
+                #{item.changeTime,jdbcType=VARCHAR}
+                from dual  
+            </foreach>  
+            ) cd  
+	</insert>
+	<!-- 批量更新审核记录信息 -->
+	<update id="updateStatusInBatch" parameterType="java.util.List">
+	    <foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+	    	update audit_record 
+	    		
+	    		<set>
+	    			<if test="item.status != null and item.status != ''">
+	    				aud_status = #{item.status},
+	    			</if>
+	    			<if test="item.reason != null and item.reason != ''">
+	    				aud_reason = #{item.reason},
+	    			</if>
+	    			<if test="item.summaryStatus != null and item.summaryStatus != ''">
+	    				aud_summary_status = #{item.summaryStatus},
+	    			</if>
+	    			<if test="item.changeTime != null and item.changeTime != ''">
+	    				aud_changetime = #{item.changeTime},
+	    			</if>
+	    			<if test="item.checkUserId != null and item.checkUserId != ''">
+	    				aud_check_userid = #{item.checkUserId},
+	    			</if>
+	    		</set>
+	    		where　aud_perid = #{item.perId} and aud_orgid = #{item.orgId}
+	    </foreach>
+	</update>
+	<!-- 统计每个省的填报数 -->
+	<select id="countByProvince" resultType="map" parameterType="map">
+		<!-- select t.dic_alias as "name",
+       count(ar.aud_id) as "value",
+       SUBSTR(t.dic_id, 0, 2) as "areaId"
+		  from dic_area_code t
+		  left join org_history o
+		    on SUBSTR(t.dic_id, 0, 2) = SUBSTR(o.org_administrative_code, 0, 2)
+		  left join audit_record ar
+		    on o.org_id = ar.aud_orgid
+		   and ar.aud_status in ('0', '1')
+		   and ar.aud_perid = #{periodId}
+		   and ar.aud_taskid = #{taskId}
+		 where t.dic_id like '%0000'
+		 group by t.dic_alias, SUBSTR(t.dic_id, 0, 2) -->
+		 	select t1.name as "name",case when t1.value=0 then 0 else round(t1.value/t2.value * 100,2) end as "value",t1.areaId as "areaId"
+			from(
+			select t.dic_alias as name,
+			       count(ar.aud_id) as value,
+			       SUBSTR(t.dic_id, 0, 2) as areaId
+			      from dic_area_code t
+			      left join org o
+			        on SUBSTR(t.dic_id, 0, 2) = SUBSTR(o.org_administrative_code, 0, 2)
+			      left join audit_record ar
+			        on o.org_id = ar.aud_orgid
+			       and ar.aud_status in ('0', '1')
+			       and ar.aud_perid = #{periodId}
+		   			and ar.aud_taskid = #{taskId}
+			     where t.dic_id like '%0000'
+			     group by t.dic_alias, SUBSTR(t.dic_id, 0, 2)
+			 ) t1    
+			inner join
+			(
+			select t.dic_alias as name,
+			       count(ar.aud_id) as value,
+			       SUBSTR(t.dic_id, 0, 2) as areaId
+			      from dic_area_code t
+			      left join org o
+			        on SUBSTR(t.dic_id, 0, 2) = SUBSTR(o.org_administrative_code, 0, 2)
+			      left join audit_record ar
+			        on o.org_id = ar.aud_orgid
+			       and ar.aud_perid = #{periodId}
+		   		 	and ar.aud_taskid = #{taskId}
+			     where t.dic_id like '%0000'
+			     group by t.dic_alias, SUBSTR(t.dic_id, 0, 2)  
+			 ) t2 on t1.name = t2.NAME    
+	</select>
+	<!-- 通过机构id查询相关任务和表期列表 -->
+	<select id="queryTP" parameterType="String" resultType="map">
+		select 
+			(select t.task_name from task t where t.task_id = ar.aud_taskid) as taskName,
+       		(select p. per_name from period p where p.per_id = ar.aud_perid) as perName
+		  from audit_record ar
+		 where ar.aud_orgid = #{orgId}
+	</select>
+	<!-- 机构批复成功后,修改审核记录的机构信息 -->
+	<update id="doChange" parameterType="map">
+		update audit_record ar set ar.aud_orgid = #{orgId} 
+			where 
+				(select t.task_status  from  task t where t.task_id = ar.aud_taskid) != '9'
+				and 
+				ar.aud_orgid = (select org_id from org where org_unique_id = #{uniqueId})
+	</update>
+
+	<!-- 删除审核记录信息 -->
+	<delete id="deleteAuditRecordByCondition" parameterType="map">
+	    delete from audit_record t where t.aud_perid = #{perId} and t.aud_orgid = #{orgId} and t.aud_taskid = #{taskId}
+
+	</delete>
+
+	<select id="findAuditRecordList" parameterType="map" resultType="map">
+		select
+		       	oh.org_id           as "orgId",
+		        oh.org_name         as "orgName",
+		       	t.aud_id 			as "id",
+				t.aud_perid 		as "perId",
+				t.aud_orgid 		as "orgId",
+				t.aud_status 		as "status",
+				t.aud_submit_userid as "submitUserId",
+				t.aud_submit_time   as "submitTime",
+				t.aud_check_userid  as "checkUserId",
+				t.aud_check_time 	as "checkTime",
+				t.aud_reason 		as "reason",
+				t.aud_summary_status as "summaryStatus",
+				t.aud_taskid 		as "taskId",
+				t.aud_changetime 	as "changeTime"
+		from org oh left join audit_record t on t.aud_orgid = oh.org_id
+		where  t.aud_perid = #{perId}
+
+		  and  t.aud_taskid = #{taskId}
+          <if test="orgName != null and orgName != ''">
+			 and oh.org_name like '%' || #{orgName} || '%'
+		  </if>
+			<if test="orgId != null and orgId != ''">
+				and oh.org_id = #{orgId}
+			</if>
+	</select>
+</mapper>

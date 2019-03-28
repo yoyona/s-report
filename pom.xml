@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+ 
+	<!-- 基本属性 - 项目属性 -->
+	<groupId>net.greatsoft</groupId>
+	<artifactId>s-report</artifactId>
+	<version>1.0.0</version>
+	<packaging>war</packaging>
+
+	<!-- 基本属性 - 属性 -->
+
+	<!-- 基本属性 - 项目关系 -->
+	<!-- <parent>
+		<groupId>net.greatsoft</groupId>
+		<artifactId>genesis7</artifactId>
+		<version>27</version>
+	</parent> -->
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-dependencies</artifactId>
+				<version>1.5.1.RELEASE</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+	<dependencies>
+		<!-- compile -->
+		<dependency>
+			<!-- 验证码 -->
+			<groupId>cn.apiclub.tool</groupId>
+			<artifactId>simplecaptcha</artifactId>
+			<version>1.2.2</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<!-- MyBatis 分页组件依赖 -->
+			<groupId>com.github.jsqlparser</groupId>
+			<artifactId>jsqlparser</artifactId>
+			<version>0.9.6</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.github.pagehelper</groupId>
+			<artifactId>pagehelper</artifactId>
+			<version>4.1.3</version>
+		</dependency>
+		<dependency>
+			<groupId>net.greatsoft</groupId>
+			<artifactId>gslib-excel-generator2</artifactId>
+			<version>1.0.0</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.greatsoft</groupId>
+			<artifactId>gslib-orm</artifactId>
+			<version>2.0.1</version>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>org.mybatis</groupId>
+					<artifactId>mybatis</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>net.greatsoft.application</groupId>
+			<artifactId>gs-app-common-util-java</artifactId>
+			<version>1.3.7</version>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>com.jhlabs</groupId>
+					<artifactId>filters</artifactId>
+				</exclusion>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>org.mybatis</groupId>
+					<artifactId>mybatis</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>net.sf.matrixjavalib</groupId>
+			<artifactId>mxlib-webapp-support</artifactId>
+			<version>2.0.1</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-core</artifactId>
+			<version>3.1.10</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-rt-frontend-jaxws</artifactId>
+			<version>3.1.10</version>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<!-- 使用 Java 内置类代替 -->
+					<groupId>com.sun.xml.bind</groupId>
+					<artifactId>jaxb-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<!-- 使用 Java 内置类代替 -->
+					<groupId>com.sun.xml.bind</groupId>
+					<artifactId>jaxb-impl</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-rt-transports-http</artifactId>
+			<version>3.1.10</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mybatis.spring.boot</groupId>
+			<artifactId>mybatis-spring-boot-starter</artifactId>
+			<version>1.2.0</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter</artifactId>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		
+	
+	    <!-- springboot-log4j -->
+	    <dependency>
+	        <groupId>org.springframework.boot</groupId>
+	        <artifactId>spring-boot-starter-log4j</artifactId>
+	        <version>1.3.8.RELEASE</version>
+	    </dependency>
+	    <dependency>
+	        <groupId>commons-logging</groupId>
+	        <artifactId>commons-logging</artifactId>
+	        <version>1.2</version>
+	    </dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<!-- 使用 Java 内置类代替 -->
+					<groupId>xml-apis</groupId>
+					<artifactId>xml-apis</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<!-- redis缓存 -->
+		<!-- <dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-redis</artifactId>
+		</dependency> -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-rest</artifactId>
+			<scope>compile</scope>
+			<exclusions>
+				<exclusion>
+					<!-- 排除传递依赖 -->
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-annotations</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<!-- <dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-log4j2</artifactId>
+			<scope>compile</scope>
+		</dependency> -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.session</groupId>
+			<artifactId>spring-session-data-redis</artifactId>
+			<scope>compile</scope>
+		</dependency>
+		<!-- provided -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<!--<scope>provided</scope>-->
+		</dependency>
+		<!-- runtime -->
+		<dependency>
+			<groupId>com.googlecode.log4jdbc</groupId>
+			<artifactId>log4jdbc</artifactId>
+			<version>1.2</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>oracle</groupId>
+			<artifactId>ojdbc7</artifactId>
+			<version>12.1.0.2</version>
+			<scope>runtime</scope>
+		</dependency>
+		<!-- test -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jetty</artifactId>
+        </dependency> -->
+        <dependency>
+			<groupId>com.alibaba</groupId>
+			<artifactId>fastjson</artifactId>
+			<version>1.2.12</version>
+		</dependency>
+		<dependency>
+	      <groupId>org.apache.commons</groupId>
+	      <artifactId>commons-io</artifactId>
+	      <version>1.3.2</version>
+    	</dependency>
+    	<dependency>
+		    <groupId>org.springframework.boot</groupId>
+		    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		<!--加入websocket-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>javax.servlet-api</artifactId>
+			<version>3.1.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.sf.json-lib</groupId>
+			<artifactId>json-lib</artifactId>
+			<version>2.4</version>
+			<classifier>jdk15</classifier>
+		</dependency>
+		
+		
+   		
+		 <dependency>  
+			    <groupId>com.jcraft</groupId>  
+			    <artifactId>jsch</artifactId>  
+			    <version>0.1.54</version>  
+		 </dependency>
+	</dependencies>
+
+
+
+	<!-- 构建设置 -->
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-war-plugin</artifactId>
+				<configuration>
+					<failOnMissingWebXml>false</failOnMissingWebXml>
+				</configuration>
+			</plugin>
+			<plugin>    
+			    <groupId>org.apache.maven.plugins</groupId>    
+			    <artifactId>maven-compiler-plugin</artifactId>    
+			    <configuration>
+			        <source>1.7</source>    
+			        <target>1.7</target>    
+			    </configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<version>1.5.1.RELEASE</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

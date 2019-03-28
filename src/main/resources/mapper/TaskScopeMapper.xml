@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TaskScopeMapper">
+	<!-- 批量导入任务范围信息 -->
+	<insert id="insertTaskScopeBatch" useGeneratedKeys="false" parameterType="java.util.List">
+	    insert all 
+	    <foreach collection="list" item="taskScope" index="index" >
+	     into task_scope
+	    	(SCO_TASKID,SCO_ORGID,SCO_REGIONPID,SCO_SUBJECTIONPID,SCO_PID)
+	    	values(
+   			#{taskScope.taskId,jdbcType=VARCHAR},
+   			#{taskScope.orgId,jdbcType=VARCHAR},
+   			#{taskScope.regionPid,jdbcType=VARCHAR},
+   			#{taskScope.subjectionPid,jdbcType=VARCHAR},
+   			#{taskScope.pid,jdbcType=VARCHAR}
+	    	)		
+	    </foreach>
+	    select 1 from dual 
+	   <!--  insert into task_scope
+	    (
+	    	sco_taskid,
+	    	sco_orgid,
+	    	sco_regionpid,
+	    	sco_subjectionpid,
+	    	sco_pid
+	    )
+	    
+	    <foreach item="item" index="index" collection="list" separator="union all">
+	     (
+             select 
+                #{item.taskId},
+                #{item.orgId},
+                #{item.regionPid},
+                #{item.subjectionPid},
+                #{item.pid} 
+              from dual
+         )
+	    </foreach> -->
+	</insert> 
+	<!-- 通过任务Id 来删除任务对应的任务范围信息 -->
+	<delete id="deleteTaskScopeByTaskId" parameterType="String">
+		delete task_scope t where t.sco_taskid = #{taskId}
+	</delete>
+	<!-- 通过任务Id 来删除任务对应的任务范围信息 -->
+	<delete id="deleteTaskScopeByOrgId" parameterType="String">
+		delete task_scope t where t.sco_orgid = #{orgId}
+	</delete>
+	<!-- 通过任务Id查询出任务范围信息 -->
+	
+	<select id="getScopeByTaskId" parameterType="long" resultType="net.greatsoft.core.domain.model.task.TaskScope">
+			select
+				t.sco_taskid as taskId,
+				t.sco_orgid  as orgId,
+				t.sco_pid as pid,
+				t.sco_regionpid as regionpid,
+				t.sco_subjectionpid as subjectionpid
+				from task_scope t
+				where t.sco_taskid = #{taskId}
+	</select>
+	<!-- 批量删除任务范围信息 -->
+	<delete id="deleteTaskScopeByBatch" parameterType="java.util.List">
+		delete from task_scope t  where
+		exists
+		(
+			select 1 from (
+				<foreach collection="list" item="taskScope" index="index" separator="union all">
+					select b.sco_orgid,b.sco.orgid from task_scope b where 1=1 
+					and b.sco_taskid = #{taskScope.taskId}
+					and	b.sco_orgid = #{taskScope.orgId}					
+				</foreach>
+			)s where t.sco_orgid = s.sco_orgid and t.sco_taskid = s.sco_taskid
+		)
+		
+	</delete>
+	<select id="getACOrgList" parameterType="hashmap" resultType="net.greatsoft.core.dto.task.OrgDto">
+		select
+			t.ORG_ID as id,
+			t.ORG_UNIQUE_ID     as uniqueId,
+			t.ORG_REGIONPID     as regionPid,
+			t.ORG_SUBJECTIONPID as subjectionPid,
+			t.ORG_NAME 			as name,
+			t.ORG_CREATE_DATE   as createDate,
+			t.ORG_REPLY_DATE    as replyDate,
+			t.ORG_STATUS        as status,
+			t.ORG_ADDRESS       as address,
+			t.ORG_EMAIL         as email,
+			t.ORG_POSTAL_CODE   as postalCode,
+			t.ORG_TELEPHONE     as telephone,
+			t.ORG_ADMINISTRATIVE_CODE   as administrativeCode,
+			t.ORG_FILL_TYPE     as fileType,
+			t.ORG_FILL_FACTOR   as fillFactor,
+			t.ORG_ECONOMIC_TYPE_CODE    as economicTypeCode,
+			t.ORG_BUDGET_MANAGEMENT_LEVEL as budgetManagementLevel,
+			t.ORG_CATEGORY      as category,
+			t.ORG_QUALITY 		as quality,
+			t.ORG_CLASS_MANAGE_CODE     as classManageCode,
+			t.ORG_HOSPITAL_GRADE        as hospitalGrade,
+			t.ORG_SUMMARY_TYPE          as summaryType,
+			t.ORG_BUDGET_CODE           as budgetCode,
+			t.ORG_CEO 					as ceo,
+			t.ORG_CFO 					as cfo,
+			t.ORG_FINANCIAL_MANAGER     as financialManager,
+			t.ORG_PREPARER 				as prepaper,
+			t.ORG_HEALTH_CATEGORY 		as healthCategory,
+			t.ORG_INCOMING_AND_OUTGOINGS as incomingAndOutgoings,
+			t.ORG_CODE 					as code,
+			t.ORG_RESERVE_CODE 			as reserveCode,
+			t.ORG_IS_CANCEL_MEDICINE    as isCancelMedicine,
+			t.ORG_IS_INTEGRATION 		as isInteGration
+		from org t
+			where t.org_id in (select tc.sco_orgid from task_scope tc where tc.sco_taskid = #{taskId})
+			and t.org_status  = '0'
+			<!-- 修改获取已选任务范围的机构信息从机构历史记录表里面,只取生效数据 -->
+	</select>
+	<!-- 通过任务id关联查询任务范围和表期信息 -->
+	<select id="getPeriodAndTaskScope" parameterType="long" resultType="hashmap">
+		Select p.per_id as perId, tc.sco_orgid as orgId
+		  from period p
+		  left join task_scope tc
+		    on p.per_taskid = tc.sco_taskid
+		 where p.per_taskid = #{taskId}
+	</select>
+	<!-- 机构批复成功后,修改机构信息为批复成功的机构历史信息id -->
+	<update id="doChange" parameterType="map">
+		update task_scope ts set ts.sco_orgid = #{orgId}
+			 
+			where
+				(select t.task_status from task t where t.task_id = ts.sco_taskid) != '9'
+				and
+			 ts.sco_orgid = (select org_id from org where org_unique_id = #{uniqueId})
+	</update>
+	<!-- 通过任务id拿到范围里面的机构的主管机构的用户 -->
+	<select id="getUsersAndTaskScope" parameterType="map" resultType="map">
+		select t.users_id as  USERID
+		  from users t
+		 inner join org o
+		    on t.admin_org_id = o.org_unique_id
+		 inner join task_scope ts
+		    on o.org_id = ts.sco_orgid
+		 where ts.sco_taskid = #{taskId} 
+		 <if test="type == 1">
+		 	and o.org_fill_type = '01'
+		 </if>
+	</select>
+
+
+	<select id="getScopeOrgIdsByTaskId" parameterType="long" resultType="java.lang.String">
+		select
+			t.sco_orgid  as orgId
+		from task_scope t
+		where t.sco_taskid = #{taskId}
+	</select>
+
+	<delete id="deleteTaskScope" parameterType="map">
+		delete from task_scope t where t.sco_taskid = #{taskId} and  t.sco_orgid = #{orgId}
+	</delete>
+
+</mapper>

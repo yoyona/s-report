@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TaskMapper">
+	
+	<!-- 根据条件查询任务信息列表 -->
+	<select id="findAllTasks" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.Task">
+		select
+	       t.task_id as taskId,
+	       t.task_des as des,
+	       t.task_orgid as orgId,
+	       t.task_name as taskName,
+	       t.task_type as type,
+	       t.task_allocation_type as allocationType,
+	       t.task_startdate as startDate,
+	       t.task_enddate as endDate,
+	       t.task_status as status,
+	       t.task_createtime as createTime,
+	       t.task_createuserid as createUserId,
+	       t.task_audittype as auditType,
+	       t.task_orgname as orgName,
+	       t.task_proceduresname as proceduresName,
+	       t.task_range_startdate as rangeStartDate,
+	       t.task_range_enddate   as rangeEndDate,
+	       (select count(1) from task_scope tc where tc.sco_taskid = t.task_id) as scopeCount,
+	       (select count(1) from TEMPLATE_INFO ti where ti.tem_taskid = t.task_id) as tempCount
+	  	from Task t  where t.task_status != '9'
+	  			<!-- 任务名称 -->
+	  			<if test="taskName !=null and taskName != ''">
+		  			and t.task_name like concat(concat('%',#{taskName}),'%')
+		  		</if>
+		  		<!-- 分配方式 -->
+			  	<if test="allocationType !=null and allocationType != ''">
+			  		and t.task_allocation_type = #{allocationType,jdbcType=VARCHAR}
+			  	</if>
+			  	<!-- 任务类型 -->
+			  	<if test="type !=null and type != ''">
+			  		and t.task_type = #{type,jdbcType=VARCHAR}
+			  	</if>
+			  	<!-- 任务状态 -->
+			  	<if test="status !=null and status != ''">
+			  		and t.task_status in 
+			  		<foreach item="item" index = "index" collection="status" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+			  	</if>
+			  	<!-- 任务开始时间和结束时间 -->
+			  	<if test="startDate !=null">
+			  		<![CDATA[
+			  		and t.task_startdate >= #{startDate}
+			  		 ]]> 
+			  	</if>
+			  	<if test="endDate !=null">
+			  		<![CDATA[
+			  		and t.task_enddate <= #{endDate}
+			  		 ]]> 
+			  	</if>
+			  	<!-- 所属机构id -->
+			  	<if test="orgIdO != null and orgIdO != ''">
+			  		and t.task_orgId = #{orgIdO}
+			  	</if>  	
+			  	order by to_number(t.task_id)
+	</select>
+	<!-- 修改任务信息 -->
+	<update id="updateTask" parameterType="net.greatsoft.core.domain.model.task.Task">
+		update task 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="orgId != null and orgId != ''">task_orgid = #{orgId},</if>
+			<if test="taskName != null and taskName != ''">task_name = #{taskName},</if>
+			<if test="startDate != null">task_startdate = #{startDate},</if>
+			<if test="endDate != null">task_enddate = #{endDate},</if>
+			<if test="allocationType != null and allocationType != ''">task_allocation_type = #{allocationType},</if>
+			<if test="des != null and des != ''">task_des = #{des},</if>
+			<if test="type != null and type != ''">task_type = #{type},</if>
+			<if test="status != null and status != ''">task_status = #{status},</if>
+			<if test="createTime != null and createTime != ''">task_createtime = #{createTime},</if>
+			<if test="createUserId != null and createUserId != ''">task_createuserid = #{createUserId},</if>
+			<if test="auditType != null and auditType != ''">task_audittype = #{auditType},</if>
+			<if test="orgName != null and orgName != ''">task_orgname = #{orgName},</if>
+			<if test="proceduresName != null and proceduresName != ''">task_proceduresname = #{proceduresName},</if>
+		</trim>	
+		where task_id = #{taskId}
+	</update>
+	<select id="queryTaskListByOrgId" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.Task">
+		select t.task_id as taskId,t.task_name as taskName,t.task_type as type,t.task_startdate as startDate,t.task_enddate as endDate,t.task_des as des from task t
+		left join task_scope ts on t.task_id = ts.sco_taskid
+		left join org o on o.org_id = ts.sco_orgid
+		where o.org_id = #{orgId}
+	</select>
+	<select id="getTaskCategoryList" parameterType="java.util.Map" resultType="net.greatsoft.core.dto.task.TaskCategoryDto">
+		select count(1) as count,t.task_status as type from task t,task_scope ts
+		where ts.sco_orgid = #{orgId} and t.task_id = ts.sco_taskid
+		group by t.task_status
+	</select>
+	<!-- 机构批复成功后,修改任务的机构信息为批复成功机构信息id x需要看任务是否不是删除的状态 -->
+	<update id="doChange" parameterType="map">
+		update task set task_orgid = #{orgId} 
+			where 
+				task_status != '9'
+			and	task_orgid = (select org_id from org where org_unique_id = #{uniqueId})
+	</update>
+	<!-- 查询开启中任务表期信息 -->
+	<select id="queryTaskPeriodList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select t.task_id,p.per_id 
+	    from TASK t
+		left join period p on t.task_id = p.per_taskid
+		where t.task_status = '2'
+	</select>
+	<!-- 查询开启中任务表期信息 -->
+	<select id="queryTaskList" parameterType="java.util.Map" resultType="java.util.Map">
+	    select t.task_id
+	    from TASK t
+		where t.task_status = '2'
+	</select>
+</mapper>

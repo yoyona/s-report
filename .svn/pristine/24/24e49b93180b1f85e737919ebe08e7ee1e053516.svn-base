@@ -1,0 +1,931 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.OrgMapper">
+	<!-- 查询机构树的信息 -->
+	<resultMap type="net.greatsoft.core.domain.model.system.Org" id="orgResultMap">
+		<id     column="ORG_ID" 					  property="id"/>
+		<result column="ORG_UNIQUE_ID"       		  property="uniqueId"/>
+		<result column="ORG_REGIONPID"       		  property="regionPid"/>
+		<result column="ORG_SUBJECTIONPID"       	  property="subjectionPid"/>
+		<result column="ORG_SUBJECTIONPID"       	  property="topSubjectPid"/>
+		<result column="ORG_NAME"       	          property="name"/>
+		<result column="ORG_CREATE_DATE"       		  property="createDate"/>
+		<result column="ORG_REPLY_DATE"       		  property="replyDate"/>
+		<result column="ORG_STATUS"       			  property="status"/>
+		<result column="ORG_ADDRESS"       			  property="address"/>
+		<result column="ORG_EMAIL"       	          property="email"/>
+		<result column="ORG_POSTAL_CODE"       		  property="postalCode"/>
+		<result column="ORG_TELEPHONE"       		  property="telephone"/>
+		<result column="ORG_ADMINISTRATIVE_CODE"      property="administrativeCode"/>
+		<result column="ORG_FILL_TYPE"                property="fileType"/>
+		<result column="ORG_FILL_FACTOR"              property="fillFactor"/>
+		<result column="ORG_ECONOMIC_TYPE_CODE"       property="economicTypeCode"/>
+		<result column="ORG_BUDGET_MANAGEMENT_LEVEL"  property="budgetManagementLevel"/>
+		<result column="ORG_CATEGORY"       		  property="category"/>
+		<result column="ORG_QUALITY"       			  property="quality"/>
+		<result column="ORG_CLASS_MANAGE_CODE"        property="classManageCode"/>
+		<result column="ORG_HOSPITAL_GRADE"           property="hospitalGrade"/>
+		<result column="ORG_SUMMARY_TYPE"             property="summaryType"/>
+		<result column="ORG_BUDGET_CODE"              property="budgetCode"/>
+		<result column="ORG_CEO"       				  property="ceo"/>
+		<result column="ORG_CFO"       				  property="cfo"/>
+		<result column="ORG_FINANCIAL_MANAGER"        property="financialManager"/>
+		<result column="ORG_PREPARER"                 property="prepaper"/>
+		<result column="ORG_HEALTH_CATEGORY"       	  property="healthCategory"/>
+		<result column="ORG_INCOMING_AND_OUTGOINGS"   property="incomingAndOutgoings"/>
+		<result column="ORG_CODE"                     property="code"/>
+		<result column="ORG_RESERVE_CODE"             property="reserveCode"/>
+		<result column="ORG_IS_CANCEL_MEDICINE"       property="isCancelMedicine"/>
+		<result column="ORG_IS_INTEGRATION"           property="isInteGration"/>
+		<result column="ORG_IS_CANCEL"                property="isCancel"/>
+		<result column="ORG_UPDATE_TIME"              property="updateTime"/>
+		<result column="ORG_UPDATE_USER_ID"           property="updateUserId"/>
+		<result column="ORG_LEVEL"                    property="orgLevel"/>
+		<result column="ORG_ADMINISTRATIVE_CATEGORY"  property="administrativeCategory"/>
+		<result column="ORG_FINANCIAL_ACCOUNTING"     property="financialAccounting"/>
+		<result column="ORG_ISWJW"                    property="isWjw"/>
+	</resultMap>
+	<sql id="org_list">
+		ORG_ID,ORG_UNIQUE_ID,ORG_REGIONPID,ORG_SUBJECTIONPID,ORG_NAME,ORG_CREATE_DATE,ORG_REPLY_DATE,
+		ORG_STATUS,ORG_ADDRESS,ORG_EMAIL,ORG_POSTAL_CODE,ORG_TELEPHONE,ORG_ADMINISTRATIVE_CODE,ORG_FILL_TYPE,
+		ORG_FILL_FACTOR,ORG_ECONOMIC_TYPE_CODE,ORG_BUDGET_MANAGEMENT_LEVEL,ORG_CATEGORY,ORG_QUALITY,ORG_CLASS_MANAGE_CODE,
+		ORG_HOSPITAL_GRADE,ORG_SUMMARY_TYPE,ORG_BUDGET_CODE,ORG_CEO,ORG_CFO,ORG_FINANCIAL_MANAGER,ORG_PREPARER,ORG_HEALTH_CATEGORY,
+		ORG_INCOMING_AND_OUTGOINGS,ORG_CODE,ORG_RESERVE_CODE,ORG_IS_CANCEL_MEDICINE,ORG_IS_INTEGRATION,ORG_IS_CANCEL,ORG_UPDATE_TIME,
+		ORG_UPDATE_USER_ID,ORG_LEVEL,ORG_ADMINISTRATIVE_CATEGORY,ORG_FINANCIAL_ACCOUNTING,ORG_ISWJW
+	</sql>
+	<select id="getOrgByCondition" parameterType="hashmap" resultMap="orgResultMap" flushCache="true">
+		select
+			<include refid="org_list" />
+		from org  where  org_is_cancel != '1'
+
+			<if test="status !=null">
+				and ORG_STATUS = #{status}
+			</if>
+			<if test="fileType != null and fileType != ''">
+				and ORG_FILL_TYPE = #{fileType}
+			</if>
+			<if test="hospitalGrade != null and hospitalGrade != ''">
+				and ORG_HOSPITAL_GRADE = #{hospitalGrade}
+			</if>
+			<if test="administrativeCode != null and administrativeCode != ''">
+				and org_administrative_code like #{administrativeCode}||'%'
+			</if>
+
+			<choose>
+				<when test="auditType == '0'">
+					start with org_id = #{orgId}
+   					connect by prior org_unique_id = org_regionpid
+				</when>
+				<when test="auditType == '1'">
+					start with org_id = #{orgId}
+   					connect by prior org_unique_id = org_subjectionpid
+				</when>
+				<otherwise>
+					start with org_id = #{orgId}
+   					connect by prior org_unique_id = org_subjectionpid
+				</otherwise>
+			</choose>
+		<!-- order by org_fill_type,org_budget_management_level,substr(org_administrative_code,1,4),org_name -->
+		order by org_administrative_code
+	</select>
+	<!-- 获取审核机构树 -->
+	<select id="getCheckTree" parameterType="map" resultType="net.greatsoft.core.dto.task.OrgDto">
+		select
+	      t.ORG_ID as id,
+	      t.ORG_UNIQUE_ID     as uniqueId,
+	      t.ORG_REGIONPID     as regionPid,
+	      t.ORG_Name        as name,
+	      t.ORG_SUBJECTIONPID   as subjectionPid,
+	      t.ORG_FILL_TYPE       as fileType,
+	      ar.aud_status       as auditStatus,
+	      ar.aud_summary_status  as summaryStatus
+	    from org t
+	      inner join task_scope ts
+	      on t.org_id = ts.sco_orgid
+	      inner join audit_record ar
+	      on t.org_id = ar.aud_orgid 
+	    where t.org_status  = '0'  and  t.org_is_cancel != '1'
+	          and ar.aud_perid = #{periodId}
+	          and ts.sco_taskid = ar.aud_taskid
+	          and ts.sco_taskid = #{taskId}
+	          and ts.sco_orgid
+	     in (
+	          select oh.org_id  from org oh
+	        start with oh.org_unique_id = #{uniqueId}  and oh.org_status  = '0' and  oh.org_is_cancel != '1'
+	        		<choose>
+	        			<when test="auditType == '0'">
+	        				connect by prior oh.org_unique_id = oh.org_regionpid
+	        			</when>
+	        			<otherwise>
+	        				connect by prior oh.org_unique_id = oh.org_subjectionpid
+	        			</otherwise>
+	        		</choose>
+	     )
+     	<!-- order by t.org_fill_type,t.org_budget_management_level,substr(t.org_administrative_code,1,4),t.org_name -->
+     	order by t.org_administrative_code, t.org_budget_management_level, t.org_id, t.org_name<!-- , t.org_administrative_code, t.org_summary_type  -->
+	</select>
+	<!-- 延迟加载树 -->
+	<select id="showTree" parameterType="map" resultMap="orgResultMap" flushCache="true">
+		select <include refid="org_list" /> from 
+		org   where org_status = #{status} and  org_is_cancel != '1'
+			and
+		<choose>
+			<!-- 按区域划分 -->
+			<when test="auditType == '0'">
+				org_regionpid = #{orgId}
+			</when>
+			<!-- 按隶属关系 -->
+			<when test="auditType == '1'">
+				org_subjectionpid = #{orgId}
+			</when>
+			<otherwise>
+				org_subjectionpid = #{orgId}
+			</otherwise>
+		</choose>
+		<if test="category != null and category != ''">
+			and t.ORG_CATEGORY in 
+			<foreach item="item" index = "index" collection="category" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+		order by org_administrative_code
+	</select>
+	<select id="checkStatus" parameterType="hashmap" resultType="Integer">
+		select t.org_status from orgstatus@wlzbdata t 
+		where t.template_id like  '%'||#{templateId}||'%' 
+		  and t.period_id    = #{perId}   
+		  and t.org_id       = #{orgId}
+	</select>
+	<select id="getDelayTree" parameterType="map" resultMap="orgResultMap">
+		select <include refid="org_list" />
+		from org 
+		<where>
+			org_status = '0'
+			<if test="uniqueId != null and uniqueId != ''">
+				and org_unique_id = #{uniqueId} or org_subjectionpid = #{uniqueId}
+			</if>
+			<!--行政区划  -->
+			<if test="administrativeCode != null and administrativeCode != ''">
+				and org_administrative_code like #{administrativeCode}||'%'
+			</if>
+			<if test="fileType != null and fileType != ''">
+				and ORG_FILL_TYPE = #{fileType}
+			</if>
+		</where>
+		and org_status = '0'
+		start with org_id = #{orgId} and org_status = '0' and org_is_cancel != '1'
+			<choose>
+				<when test="auditType == '0'">
+					connect by prior org_unique_id = org_regionpid
+				</when>
+				<otherwise>
+					connect by prior org_unique_id = org_subjectionpid
+				</otherwise>
+			</choose>
+   		order by org_level, org_administrative_code, org_budget_management_level, org_id, org_name
+	</select>
+
+	<!-- 查询用户代理机构列表 -->
+	<select id="findUserAgentList" parameterType="java.util.Map" resultMap="orgResultMap">
+		select <include refid="org_list" />
+		from USER_AGENT,ORG
+		where agent_org_id = org_id
+		and agent_user_id = #{userId}
+		order by org_level
+	</select>
+
+	<!-- 查询用户代理的机构列表附带审核状态信息-->
+
+	<select id="findUserAgentListWithAuditStatus" parameterType="java.util.Map" resultType="map">
+		select
+		     o.org_id as "id",
+		     o.org_unique_id as "uniqueId",
+		     o.org_name as "name",
+		     o.org_subjectionpid as "subjectionPid",
+		     ar.aud_status as "audStatus"
+		from USER_AGENT u,ORG o,audit_record ar
+		where u.agent_org_id = o.org_id and o.org_id = ar.aud_orgid
+		and u.agent_user_id = #{userId}  and  ar.aud_perid = #{periodId} and aud_taskid = #{taskId}
+		order by o.org_level
+	</select>
+
+	<select id="getOrgsByPid" parameterType="map" resultMap="orgResultMap">
+		select <include refid="org_list" />
+	      from org t
+	      left join audit_record r on t.org_id = r.aud_orgid
+	     where r.aud_taskid = #{taskId}
+	     and r.aud_perid = #{perId}
+	     and t.org_status = '0'
+		 and t.org_is_cancel != '1'
+	     <if test="status != null and status != '' and status == '0'">
+			and r.aud_status in ('2','0')
+		</if>
+		<if test="status != null and status != '' and status == '9'">
+			and r.aud_status = '9'
+		</if>
+		<if test="areaId != null and areaId != ''">
+			and substr(t.org_administrative_code, 0, 2) = #{areaId}
+		</if>
+		<if test="areaId == null or areaId == ''">
+			and t.org_subjectionpid = (select o.org_unique_id from org o where o.org_unique_id = #{uniqueId})
+		</if>
+	    order by t.org_iswjw desc,t.org_fill_type,t.org_administrative_code
+	</select>
+	<!-- 获取对应省级下面的机构列表 -->
+	<select id="getOrgsByProvinces" parameterType="String" resultMap="orgResultMap">
+		select <include refid="org_list" />
+		from org t
+		where t.org_administrative_code like #{administrativeCode}||'%'
+		order by t.org_fill_type,t.org_level
+	</select>
+	<!-- 修改整条机构信息 -->
+	<update id="updateOrg" parameterType="net.greatsoft.core.domain.model.system.Org">
+		update org 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="id != null and id != ''">org_id=#{id},</if>
+			<if test="regionPid != null and regionPid != ''">ORG_REGIONPID=#{regionPid},</if>
+			<if test="subjectionPid != null and subjectionPid != ''">ORG_SUBJECTIONPID=#{subjectionPid},</if>
+			<if test="name != null and name != ''">ORG_NAME=#{name},</if>
+			<if test="createDate != null">ORG_CREATE_DATE=#{createDate},</if>
+			<if test="replyDate != null">ORG_REPLY_DATE=#{replyDate},</if>
+			<if test="status != null and status != ''">ORG_STATUS=#{status},</if>
+			<if test="address != null and address != ''">ORG_ADDRESS=#{address},</if>
+			<if test="email != null and email != ''">ORG_EMAIL=#{email},</if>
+			<if test="postalCode != null and postalCode != ''">ORG_POSTAL_CODE=#{postalCode},</if>
+			<if test="telephone != null and telephone != ''">ORG_TELEPHONE=#{telephone},</if>
+			<if test="administrativeCode != null and administrativeCode != ''">ORG_ADMINISTRATIVE_CODE=#{administrativeCode},</if>
+			<if test="fileType != null and fileType != ''">ORG_FILL_TYPE=#{fileType},</if>
+			<if test="fillFactor != null and fillFactor != ''">ORG_FILL_FACTOR=#{fillFactor},</if>
+			<if test="economicTypeCode != null and economicTypeCode != ''">ORG_ECONOMIC_TYPE_CODE=#{economicTypeCode},</if>
+			<if test="budgetManagementLevel != null and budgetManagementLevel != ''">ORG_BUDGET_MANAGEMENT_LEVEL=#{budgetManagementLevel},</if>
+			<if test="category != null and category != ''">ORG_CATEGORY=#{category},</if>
+			<if test="quality != null and quality != ''">ORG_QUALITY=#{quality},</if>
+			<if test="classManageCode != null and classManageCode != ''">ORG_CLASS_MANAGE_CODE=#{classManageCode},</if>
+			<if test="hospitalGrade != null and hospitalGrade != ''">ORG_HOSPITAL_GRADE=#{hospitalGrade},</if>
+			<if test="summaryType != null and summaryType != ''">ORG_SUMMARY_TYPE=#{summaryType},</if>
+			<if test="budgetCode != null and budgetCode != ''">ORG_BUDGET_CODE=#{budgetCode},</if>
+			<if test="ceo != null and ceo != ''">ORG_CEO=#{ceo},</if>
+			<if test="cfo != null and cfo != ''">ORG_CFO=#{cfo},</if>
+			<if test="financialManager != null and financialManager != ''">ORG_FINANCIAL_MANAGER=#{financialManager},</if>
+			<if test="prepaper != null and prepaper != ''">ORG_PREPARER=#{prepaper},</if>
+			<if test="healthCategory != null and healthCategory != ''">ORG_HEALTH_CATEGORY=#{healthCategory},</if>
+			<if test="incomingAndOutgoings != null and incomingAndOutgoings != ''">ORG_INCOMING_AND_OUTGOINGS=#{incomingAndOutgoings},</if>
+			<if test="code != null and code != ''">ORG_CODE=#{code},</if>
+			<if test="reserveCode != null and reserveCode != ''">ORG_RESERVE_CODE=#{reserveCode},</if>
+			<if test="isCancelMedicine != null and isCancelMedicine != ''">ORG_IS_CANCEL_MEDICINE=#{isCancelMedicine},</if>
+			<if test="isInteGration != null and isInteGration != ''">ORG_IS_INTEGRATION=#{isInteGration},</if>
+			<if test="isCancel != null and isCancel != ''">ORG_IS_CANCEL=#{isCancel},</if>
+			<if test="updateTime != null">ORG_UPDATE_TIME=#{updateTime},</if>
+			<if test="updateUserId != null and updateUserId != ''">ORG_UPDATE_USER_ID=#{updateUserId},</if>
+			<if test="orgLevel != null and orgLevel != ''">ORG_LEVEL=#{orgLevel},</if>
+			<if test="administrativeCategory != null and administrativeCategory != ''">ORG_ADMINISTRATIVE_CATEGORY=#{administrativeCategory},</if>
+			<if test="financialAccounting != null and financialAccounting != ''">ORG_FINANCIAL_ACCOUNTING=#{financialAccounting},</if>
+			<if test="isWjw != null and isWjw != ''">ORG_ISWJW=#{isWjw},</if>	
+		</trim>
+		where ORG_UNIQUE_ID = #{uniqueId}
+	</update>
+	<update id="updateOrgById" parameterType="net.greatsoft.core.domain.model.system.Org">
+		update org 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="uniqueId != null and uniqueId != ''">ORG_UNIQUE_ID = #{uniqueId},</if>
+			<if test="regionPid != null and regionPid != ''">ORG_REGIONPID=#{regionPid},</if>
+			<if test="subjectionPid != null and subjectionPid != ''">ORG_SUBJECTIONPID=#{subjectionPid},</if>
+			<if test="name != null and name != ''">ORG_NAME=#{name},</if>
+			<if test="createDate != null">ORG_CREATE_DATE=#{createDate},</if>
+			<if test="replyDate != null">ORG_REPLY_DATE=#{replyDate},</if>
+			<if test="status != null and status != ''">ORG_STATUS=#{status},</if>
+			<if test="address != null and address != ''">ORG_ADDRESS=#{address},</if>
+			<if test="email != null and email != ''">ORG_EMAIL=#{email},</if>
+			<if test="postalCode != null and postalCode != ''">ORG_POSTAL_CODE=#{postalCode},</if>
+			<if test="telephone != null and telephone != ''">ORG_TELEPHONE=#{telephone},</if>
+			<if test="administrativeCode != null and administrativeCode != ''">ORG_ADMINISTRATIVE_CODE=#{administrativeCode},</if>
+			<if test="fileType != null and fileType != ''">ORG_FILL_TYPE=#{fileType},</if>
+			<if test="fillFactor != null and fillFactor != ''">ORG_FILL_FACTOR=#{fillFactor},</if>
+			<if test="economicTypeCode != null and economicTypeCode != ''">ORG_ECONOMIC_TYPE_CODE=#{economicTypeCode},</if>
+			<if test="budgetManagementLevel != null and budgetManagementLevel != ''">ORG_BUDGET_MANAGEMENT_LEVEL=#{budgetManagementLevel},</if>
+			<if test="category != null and category != ''">ORG_CATEGORY=#{category},</if>
+			<if test="quality != null and quality != ''">ORG_QUALITY=#{quality},</if>
+			<if test="classManageCode != null and classManageCode != ''">ORG_CLASS_MANAGE_CODE=#{classManageCode},</if>
+			<if test="hospitalGrade != null and hospitalGrade != ''">ORG_HOSPITAL_GRADE=#{hospitalGrade},</if>
+			<if test="summaryType != null and summaryType != ''">ORG_SUMMARY_TYPE=#{summaryType},</if>
+			<if test="budgetCode != null and budgetCode != ''">ORG_BUDGET_CODE=#{budgetCode},</if>
+			<if test="ceo != null and ceo != ''">ORG_CEO=#{ceo},</if>
+			<if test="cfo != null and cfo != ''">ORG_CFO=#{cfo},</if>
+			<if test="financialManager != null and financialManager != ''">ORG_FINANCIAL_MANAGER=#{financialManager},</if>
+			<if test="prepaper != null and prepaper != ''">ORG_PREPARER=#{prepaper},</if>
+			<if test="healthCategory != null and healthCategory != ''">ORG_HEALTH_CATEGORY=#{healthCategory},</if>
+			<if test="incomingAndOutgoings != null and incomingAndOutgoings != ''">ORG_INCOMING_AND_OUTGOINGS=#{incomingAndOutgoings},</if>
+			<if test="code != null and code != ''">ORG_CODE=#{code},</if>
+			<if test="reserveCode != null and reserveCode != ''">ORG_RESERVE_CODE=#{reserveCode},</if>
+			<if test="isCancelMedicine != null and isCancelMedicine != ''">ORG_IS_CANCEL_MEDICINE=#{isCancelMedicine},</if>
+			<if test="isInteGration != null and isInteGration != ''">ORG_IS_INTEGRATION=#{isInteGration},</if>
+			<if test="isCancel != null and isCancel != ''">ORG_IS_CANCEL=#{isCancel},</if>
+			<if test="updateTime != null">ORG_UPDATE_TIME=#{updateTime},</if>
+			<if test="updateUserId != null and updateUserId != ''">ORG_UPDATE_USER_ID=#{updateUserId},</if>
+			<if test="orgLevel != null and orgLevel != ''">ORG_LEVEL=#{orgLevel},</if>
+			<if test="administrativeCategory != null and administrativeCategory != ''">ORG_ADMINISTRATIVE_CATEGORY=#{administrativeCategory},</if>
+			<if test="financialAccounting != null and financialAccounting != ''">ORG_FINANCIAL_ACCOUNTING=#{financialAccounting},</if>
+			<if test="isWjw != null and isWjw != ''">ORG_ISWJW=#{isWjw},</if>	
+		</trim>
+		where org_id = #{uniqueId}
+	</update>
+	<!-- 延迟加载树的点击事件,包含条件加载树节点的下级列表 -->
+	<select id="getSubordinateData" parameterType="map" resultMap="orgResultMap">
+		select <include refid="org_list" />
+		from org
+		where org_subjectionpid = #{uniqueId} and org_is_cancel != '1'
+		<if test="fileType != null and fileType != ''">
+			and org_fill_type = #{fileType}
+		</if>
+		order by org_level, org_administrative_code, org_budget_management_level, org_id, org_name
+	</select>
+	<!-- 统计任务范围加载树之后的机构列表里面有多少的填报类型以及其对应的个数 -->
+	<select id="statisticsScopeTree" resultType="map" parameterType="map">
+		select m.FILLTYPE as FIllTYPE,M.DICNAME as DICNAME,m.COUNT as MAX_COUNT,n.TCOUNT as MIN_COUNT
+  from (select o.org_fill_type as FIllTYPE,
+               d.dic_name as DICNAME,
+               count(o.org_fill_type) as COUNT
+          from org o
+          left join dic d
+            on o.org_fill_type = d.dic_id
+         start with o.org_id = #{orgId}
+                and o.org_status = '0'
+                and o.org_is_cancel != '1'
+        <choose>
+        	<when test="auditType == '0'">
+        		connect by prior o.org_unique_id = o.org_regionpid
+        	</when>
+        	<otherwise>
+        		connect by prior o.org_unique_id = o.org_subjectionpid
+        	</otherwise>
+        </choose>
+         group by o.org_fill_type, d.dic_name) m
+  left join (select o.org_fill_type as FIllTYPE,
+                    d.dic_name as DICNAME,
+                    nvl(count(o.org_fill_type), 0) as TCOUNT
+               from org o
+               left join dic d
+                 on o.org_fill_type = d.dic_id
+              where o.org_id in (select tc.sco_orgid
+                                   from task_scope tc
+                                  where tc.sco_taskid = #{taskId})
+                and o.org_status = '0'
+				and o.org_is_cancel != '1'
+              group by o.org_fill_type, d.dic_name) n
+    on m.FIllTYPE = n.FIllTYPE and m.DICNAME = n.DICNAME
+
+	</select>
+	<select id="findOrgAgentTree" parameterType="map" resultType="net.greatsoft.core.dto.task.OrgDto">
+		select
+		 	t.org_id as id,
+		    t.org_unique_id     	as uniqueId,
+		    t.org_regionpid     	as regionPid,
+		    t.org_name        		as name,
+		    t.org_subjectionpid   	as subjectionPid,
+		    u.agent_user_id  		as code 
+		from org t left join user_agent u
+		on t.org_unique_id = u.agent_org_id 
+		<if test="userId != null and userId !=''">
+				and u.agent_user_id = #{userId}
+		</if>
+		start with org_id = #{orgId}
+   		connect by prior org_unique_id = org_subjectionpid
+	</select>	
+	<select id="directlyUnderOrgs" parameterType="map" resultType="net.greatsoft.core.dto.task.OrgDto" flushCache="true">
+	    select
+        t.ORG_ID as id,
+        t.ORG_UNIQUE_ID     as uniqueId,
+        t.ORG_REGIONPID     as regionPid,
+        t.ORG_Name        as name,
+        t.ORG_SUBJECTIONPID   as subjectionPid,
+        t.ORG_HOSPITAL_GRADE as hospitalGrade,
+        d.dic_name as hospitalGradeName,
+        t.ORG_CATEGORY as category,
+        d1.dic_name as categoryName,
+        t.ORG_FILL_TYPE       as fileType,
+        d2.dic_name as fileTypeName,
+        ar.aud_status       as auditStatus,
+        ar.aud_summary_status  as summaryStatus,
+        ar.aud_submit_time as submitTime
+      from org t
+        inner join task_scope ts
+        on t.org_id = ts.sco_orgid
+        inner join audit_record ar
+        on t.org_id = ar.aud_orgid 
+      left join DIC d on d.dic_type = 't6' and d.dic_id = t.org_hospital_grade
+      left join DIC d1 ON d1.dic_type = 't9' and d1.dic_id = t.org_category
+      left join DIC d2 ON d2.dic_type = 't5' and d2.dic_id = t.org_fill_type
+      where t.org_status = '0'
+            and ar.aud_perid = #{periodId}
+            and ts.sco_taskid = ar.aud_taskid
+            and ts.sco_taskid = #{taskId}
+            and ts.sco_orgid != #{orgId}
+            and t.org_subjectionpid = #{orgId}
+			and t.org_is_cancel != '1'
+            <!-- and ts.sco_orgid
+       in (
+            select oh.org_id  from org oh
+          start with oh.org_id = #{orgId}  and oh.org_status in ('0','1')
+          connect by prior oh.org_unique_id = oh.org_subjectionpid
+       ) -->
+       order by t.org_fill_type,t.org_budget_management_level,substr(t.org_administrative_code,1,4),t.org_name
+	</select>
+
+	<select id="findOpenRegistryOrgs" resultType="net.greatsoft.core.domain.model.system.Org">
+		select
+		<!--to_number(ORG_ID)	 as id,-->
+		ORG_ID 	 as topSubjectPid,
+		ORG_ID	 as uniqueId,<!--机构唯一标识-->
+		ORG_PID	 as regionPid,<!--上级机构(区域划分)-->
+		ORG_PID	 as subjectionPid,<!--上级机构(隶属关系)-->
+		ORG_NAME	 as name,<!--机构名称-->
+		CREATE_TIME	 as createDate,<!--创建时间-->
+		ORG_APPROVE_TIME <!--审核时间-->	 as replyDate,<!--批复时间-->
+		'0'	 as status,<!--状态（0有效1无效9待批复）-->
+		ORG_ADDRESS	 as address,<!--机构地址-->
+		EMAIL	 as email,<!--email-->
+		POSTCODE	 as postalCode,<!--邮政编码-->
+		ORG_PHONE	 as telephone,<!--联系电话-->
+		DISTRICT_CODE	 as administrativeCode,<!--行政区划代码-->
+		REPORT_TYPE_CODE	 as fileType,<!--填报类型-->
+		REPORT_REASON	 as fillFactor,<!--填报因素-->
+		ECONOMIC_TYPE	 as economicTypeCode,<!--经济类型代码-->
+		BUDGET_LEVEL as budgetManagementLevel,<!--预算管理级次-->
+		ORG_TYPE_CODE	 as category,<!--机构类别-->
+		ORG_PROP as quality,<!--单位性质-->
+		MANAGMENT_TYPE	 as classManageCode,<!--机构分类管理代码-->
+		HOS_LEVEL	 as hospitalGrade,<!--医疗机构级别和等级-->
+		<!-- as summaryType,--><!--汇总类型-->
+		BUDGET_CODE	 as budgetCode,<!--财政预算代码-->
+		ORG_CHARGER	 as ceo,<!--单位负责人-->
+		ACCOUNTANT	 as cfo,<!--总会计师-->
+		ORG_ACHARGER	 as financialManager,<!--财务负责人-->
+		DEALER	 as prepaper,<!--填表人-->
+		ORG_FULL_CODE	 as healthCategory,<!--卫生机构分类代码-->
+		IS_INCOME_TWO_LINES	 as incomingAndOutgoings,<!--试行收支两线-->
+		<!-- as code,--><!--组织机构代码-->
+		<!--	 as reserveCode,--><!--备用码-->
+		IS_CACEL_SUPPLE_MEDICAL	 as isCancelMedicine,<!--是否取消以药补医-->
+		IS_FINANCIAL_INTEGRATION	 as isInteGration,<!--是否实行乡村（中心站）财务一体化-->
+		IS_DELETED	 as isCancel,<!--是否删除-->
+		MODIFIED_TIME	 as updateTime,<!--更新时间-->
+		MODIFIER_ID	 as updateUserId,<!--更新用户id-->
+		<!-- as isWjw,--><!--是否为卫计委单位(1是0否)-->
+		HOS_LEVEL	 as orgLevel<!--机构级别（按隶属关系）-->
+		<!--	 as administrativeCategory,--><!--行政机构类型-->
+		<!--	 as financialAccounting--><!--执行财务会计制度类型-->
+			from org@openregistry
+		where org_approve_status = '2' <!--查询审核通过数据-->
+
+	</select>
+
+	<insert id="insertOpenRegistryOrgs">
+		INSERT
+	        INTO
+	        ORG(ORG_ID, ORG_UNIQUE_ID, ORG_REGIONPID, ORG_SUBJECTIONPID, ORG_NAME,
+			ORG_CREATE_DATE, ORG_REPLY_DATE, ORG_STATUS, ORG_ADDRESS, ORG_EMAIL,
+			ORG_POSTAL_CODE, ORG_TELEPHONE,ORG_ADMINISTRATIVE_CODE,ORG_FILL_TYPE,
+			ORG_FILL_FACTOR,ORG_ECONOMIC_TYPE_CODE,ORG_BUDGET_MANAGEMENT_LEVEL,
+			ORG_CATEGORY,ORG_QUALITY,ORG_CLASS_MANAGE_CODE,ORG_HOSPITAL_GRADE,
+			ORG_BUDGET_CODE,ORG_CEO, ORG_CFO, ORG_FINANCIAL_MANAGER,ORG_PREPARER,
+			ORG_HEALTH_CATEGORY,ORG_INCOMING_AND_OUTGOINGS,ORG_IS_CANCEL_MEDICINE,
+			ORG_IS_INTEGRATION,ORG_IS_CANCEL,ORG_UPDATE_TIME,ORG_UPDATE_USER_ID,
+			ORG_SUMMARY_TYPE
+	        )
+		select
+			ORG_ID,ORG_ID,ORG_PID,ORG_PID,
+			ORG_NAME,
+			CREATE_TIME,
+			ORG_APPROVE_TIME,
+			'0',
+			ORG_ADDRESS,
+			EMAIL,
+			POSTCODE,
+			ORG_PHONE,
+			DISTRICT_CODE,
+			REPORT_TYPE_CODE,
+			REPORT_REASON,
+			ECONOMIC_TYPE,
+			BUDGET_LEVEL,
+			ORG_TYPE_CODE,
+			ORG_PROP,
+			MANAGMENT_TYPE,
+			HOS_LEVEL,
+			BUDGET_CODE,
+			ORG_CHARGER,
+			ACCOUNTANT,
+			ORG_ACHARGER,
+			DEALER,
+			ORG_FULL_CODE,
+			IS_INCOME_TWO_LINES,
+			IS_CACEL_SUPPLE_MEDICAL,
+			IS_FINANCIAL_INTEGRATION,
+			IS_DELETED,
+			MODIFIED_TIME,
+			MODIFIER_ID,
+			decode(REPORT_TYPE_CODE, '01', '2', '')
+		from org@openregistry
+		<!--  where org_approve_status = '2' -->
+
+	</insert>
+
+	<select id="findOpenRegistryOrgsProvince" resultType="net.greatsoft.core.domain.model.system.Org">
+		select
+		ORG_ID   as id,
+		ORG_ID 	 as topSubjectPid,
+		ORG_ID	 as uniqueId,
+		ORG_PID	 as regionPid,
+		ORG_PID	 as subjectionPid,
+		ORG_NAME	 as name,
+		CREATE_TIME	 as createDate,
+		ORG_APPROVE_TIME 	 as replyDate,
+		'0'	 as status,
+		ORG_ADDRESS	 as address,
+		EMAIL	 as email,
+		POSTCODE	 as postalCode,
+		ORG_PHONE	 as telephone,
+		DISTRICT_CODE	 as administrativeCode,
+		REPORT_TYPE_CODE	 as fileType,
+		REPORT_REASON	 as fillFactor,
+		ECONOMIC_TYPE	 as economicTypeCode,
+		BUDGET_LEVEL as budgetManagementLevel,
+		ORG_TYPE_CODE	 as category,
+		ORG_PROP as quality,
+		MANAGMENT_TYPE	 as classManageCode,
+		HOS_LEVEL	 as hospitalGrade,
+		BUDGET_CODE	 as budgetCode,
+		ORG_CHARGER	 as ceo,
+		ACCOUNTANT	 as cfo,
+		ORG_ACHARGER	 as financialManager,
+		DEALER	 as prepaper,
+		ORG_FULL_CODE	 as healthCategory,
+		IS_INCOME_TWO_LINES	 as incomingAndOutgoings,
+		IS_CACEL_SUPPLE_MEDICAL	 as isCancelMedicine,
+		IS_FINANCIAL_INTEGRATION	 as isInteGration,
+		IS_DELETED	 as isCancel,
+		MODIFIED_TIME	 as updateTime,
+		MODIFIER_ID	 as updateUserId,
+		HOS_LEVEL	 as orgLevel
+		from org@openregistry
+		where REPORT_TYPE_CODE = '01' <!--  and org_approve_status = '2' and  org_pid =  '7178369721101021' -->
+
+	</select>
+
+
+
+
+	<delete id="deleteAllOrg">
+		delete from org where org_id != '1'
+	</delete>
+
+	<insert id="insertBatchOrg" parameterType="java.util.List">
+		INSERT INTO org(
+		org_id,
+		ORG_UNIQUE_ID,
+		ORG_REGIONPID,
+		ORG_SUBJECTIONPID,
+		ORG_NAME,
+		ORG_CREATE_DATE,
+		ORG_REPLY_DATE,
+		ORG_STATUS,
+		ORG_ADDRESS,
+		ORG_EMAIL,
+		ORG_POSTAL_CODE,
+		ORG_TELEPHONE,
+		ORG_ADMINISTRATIVE_CODE,
+		ORG_FILL_TYPE,
+		ORG_FILL_FACTOR,
+		ORG_ECONOMIC_TYPE_CODE,
+		ORG_BUDGET_MANAGEMENT_LEVEL,
+		ORG_CATEGORY,
+		ORG_QUALITY,
+		ORG_CLASS_MANAGE_CODE,
+		ORG_HOSPITAL_GRADE,
+		<!-- ORG_SUMMARY_TYPE, -->
+		ORG_BUDGET_CODE,
+		ORG_CEO,
+		ORG_CFO,
+		ORG_FINANCIAL_MANAGER,
+		ORG_PREPARER,
+		ORG_HEALTH_CATEGORY,
+		ORG_INCOMING_AND_OUTGOINGS,
+		<!--ORG_CODE, -->
+		<!-- ORG_RESERVE_CODE, -->
+		ORG_IS_CANCEL_MEDICINE,
+		ORG_IS_INTEGRATION,
+		ORG_IS_CANCEL,
+		ORG_UPDATE_TIME,
+		ORG_UPDATE_USER_ID,
+		ORG_LEVEL
+		<!--ORG_ADMINISTRATIVE_CATEGORY,-->
+		<!--ORG_FINANCIAL_ACCOUNTING,-->
+
+		<!-- ORG_ISWJW-->
+		)
+		select SEQ_ORG.nextval,cd.* from(
+		<foreach collection="list" item="item" index="index" separator="union all">
+			select
+			#{item.uniqueId,jdbcType=VARCHAR},
+			#{item.regionPid,jdbcType=VARCHAR},
+			#{item.subjectionPid,jdbcType=VARCHAR},
+			#{item.name,jdbcType=VARCHAR},
+			#{item.createDate,jdbcType=DATE},
+			#{item.replyDate,jdbcType=DATE},
+			#{item.status,jdbcType=VARCHAR},
+			#{item.address,jdbcType=VARCHAR},
+			#{item.email,jdbcType=VARCHAR},
+			#{item.postalCode,jdbcType=VARCHAR},
+			#{item.telephone,jdbcType=VARCHAR},
+			#{item.administrativeCode,jdbcType=VARCHAR},
+			#{item.fileType,jdbcType=VARCHAR},
+			#{item.fillFactor,jdbcType=VARCHAR},
+			#{item.economicTypeCode,jdbcType=VARCHAR},
+			#{item.budgetManagementLevel,jdbcType=VARCHAR},
+			#{item.category,jdbcType=VARCHAR},
+			#{item.quality,jdbcType=VARCHAR},
+			#{item.classManageCode,jdbcType=VARCHAR},
+			#{item.hospitalGrade,jdbcType=VARCHAR},
+			<!--#{item.summaryType,jdbcType=VARCHAR}-->
+			#{item.budgetCode,jdbcType=VARCHAR},
+			#{item.ceo,jdbcType=VARCHAR},
+			#{item.cfo,jdbcType=VARCHAR},
+			#{item.financialManager,jdbcType=VARCHAR},
+			#{item.prepaper,jdbcType=VARCHAR},
+			#{item.healthCategory,jdbcType=VARCHAR},
+			#{item.incomingAndOutgoings,jdbcType=VARCHAR},
+			<!--#{item.code,jdbcType=VARCHAR},-->
+			<!--#{item.reserveCode,jdbcType=VARCHAR},-->
+			#{item.isCancelMedicine,jdbcType=VARCHAR},
+			#{item.isInteGration,jdbcType=VARCHAR},
+			#{item.isCancel,jdbcType=DOUBLE},
+			#{item.updateTime,jdbcType=DATE},
+			#{item.updateUserId,jdbcType=VARCHAR},
+			#{item.orgLevel,jdbcType=VARCHAR}
+			<!--#{item.administrativeCategory,jdbcType=VARCHAR},-->
+			<!--#{item.financialAccounting,jdbcType=VARCHAR},-->
+			<!--#{item.isWjw,jdbcType=VARCHAR}-->
+			from dual
+		</foreach>
+		) cd
+	</insert>
+
+	<insert id="insertBatchOrg2" useGeneratedKeys="false" parameterType="java.util.List">
+		insert all
+		<foreach collection="list" item="org" index="index" >
+			INTO org(
+			org_id,
+			ORG_UNIQUE_ID,
+			ORG_REGIONPID,
+			ORG_SUBJECTIONPID,
+			ORG_NAME,
+			ORG_CREATE_DATE,
+			ORG_REPLY_DATE,
+			ORG_STATUS,
+			ORG_ADDRESS,
+			ORG_EMAIL,
+			ORG_POSTAL_CODE,
+			ORG_TELEPHONE,
+			ORG_ADMINISTRATIVE_CODE,
+			ORG_FILL_TYPE,
+			ORG_FILL_FACTOR,
+			ORG_ECONOMIC_TYPE_CODE,
+			ORG_BUDGET_MANAGEMENT_LEVEL,
+			ORG_CATEGORY,
+			ORG_QUALITY,
+			ORG_CLASS_MANAGE_CODE,
+			ORG_HOSPITAL_GRADE,
+			ORG_BUDGET_CODE,
+			ORG_CEO,
+			ORG_CFO,
+			ORG_FINANCIAL_MANAGER,
+			ORG_PREPARER,
+			ORG_HEALTH_CATEGORY,
+			ORG_INCOMING_AND_OUTGOINGS,
+			ORG_IS_CANCEL_MEDICINE,
+			ORG_IS_INTEGRATION,
+			ORG_IS_CANCEL,
+			ORG_UPDATE_TIME,
+			ORG_UPDATE_USER_ID,
+			ORG_LEVEL
+			)
+			values(
+			#{org.topSubjectPid,jdbcType=VARCHAR},
+			#{org.uniqueId,jdbcType=VARCHAR},
+			#{org.regionPid,jdbcType=VARCHAR},
+			#{org.subjectionPid,jdbcType=VARCHAR},
+			#{org.name,jdbcType=VARCHAR},
+			#{org.createDate,jdbcType=DATE},
+			#{org.replyDate,jdbcType=DATE},
+			#{org.status,jdbcType=VARCHAR},
+			#{org.address,jdbcType=VARCHAR},
+			#{org.email,jdbcType=VARCHAR},
+			#{org.postalCode,jdbcType=VARCHAR},
+			#{org.telephone,jdbcType=VARCHAR},
+			#{org.administrativeCode,jdbcType=VARCHAR},
+			#{org.fileType,jdbcType=VARCHAR},
+			#{org.fillFactor,jdbcType=VARCHAR},
+			#{org.economicTypeCode,jdbcType=VARCHAR},
+			#{org.budgetManagementLevel,jdbcType=VARCHAR},
+			#{org.category,jdbcType=VARCHAR},
+			#{org.quality,jdbcType=VARCHAR},
+			#{org.classManageCode,jdbcType=VARCHAR},
+			#{org.hospitalGrade,jdbcType=VARCHAR},
+			#{org.budgetCode,jdbcType=VARCHAR},
+			#{org.ceo,jdbcType=VARCHAR},
+			#{org.cfo,jdbcType=VARCHAR},
+			#{org.financialManager,jdbcType=VARCHAR},
+			#{org.prepaper,jdbcType=VARCHAR},
+			#{org.healthCategory,jdbcType=VARCHAR},
+			#{org.incomingAndOutgoings,jdbcType=VARCHAR},
+			#{org.isCancelMedicine,jdbcType=VARCHAR},
+			#{org.isInteGration,jdbcType=VARCHAR},
+			#{org.isCancel,jdbcType=DOUBLE},
+			#{org.updateTime,jdbcType=DATE},
+			#{org.updateUserId,jdbcType=VARCHAR},
+			#{org.orgLevel,jdbcType=VARCHAR}
+			)
+		</foreach>
+		select 1 from dual
+
+	</insert>
+
+	<!--新增直属机构需要更新下级主管单位的PID-->
+	<update id="updateOpenFollowOrg" parameterType="map">
+		update org set ORG_REGIONPID = #{id}, ORG_SUBJECTIONPID = #{id} where ORG_SUBJECTIONPID = #{pid} and ORG_ID != #{aid} || '' AND ORG_FILL_TYPE != '01'
+	</update>
+	<!--删除直属汇总机构后恢复下级机构-->
+	<update id="updateOpenFollowOrgBack" parameterType="map">
+		update org set ORG_REGIONPID = #{id}, ORG_SUBJECTIONPID = #{id} where ORG_SUBJECTIONPID = #{pid}
+	</update>
+
+	<select id="queryOrg" parameterType="map" resultMap="orgResultMap">
+		select 
+			<include refid="org_list"></include>
+			from org oh,audit_record t
+			where t.aud_orgid = oh.org_id  
+			and t.aud_perid = #{perId} 
+			and oh.org_unique_id = #{uniqueId}
+	   		and oh.org_status = '0'
+			and oh.org_is_cancel != '1'
+	</select>
+
+	<!--历史档案树 只查询两级树-->
+	<select id="findHistoryDetailTree" parameterType="map" resultType="map">
+		select t.org_name as "name", t.ORG_UNIQUE_ID as "uniqueId", t.ORG_SUBJECTIONPID as "subjectionPid", h.his_url as "toUrl"
+		from org t left join HISTORY_QUERY_PARAM h
+			  on t.org_id =  h.his_orgid and h.his_year = #{year}
+        where t.org_id != '1'  and ORG_subjectionPid = #{orgId} or org_id = #{orgId}
+		order by t.org_administrative_code, t.org_budget_management_level, t.org_id, t.org_name
+ 	</select>
+
+	<!-- 获取审核机构树 -->
+	<select id="findCheckTreeTop" parameterType="map" resultType="net.greatsoft.core.dto.task.OrgDto">
+	  select
+		t.ORG_ID as id,
+		t.ORG_UNIQUE_ID     as uniqueId,
+		t.ORG_REGIONPID     as regionPid,
+		t.ORG_Name        as name,
+		t.ORG_SUBJECTIONPID   as subjectionPid,
+		t.ORG_FILL_TYPE       as fileType,
+		ar.aud_status       as auditStatus,
+		ar.aud_summary_status  as summaryStatus
+		from org t
+		inner join task_scope ts
+			on t.org_id = ts.sco_orgid
+		inner join audit_record ar
+			on t.org_id = ar.aud_orgid and ts.sco_taskid = ar.aud_taskid and ar.aud_perid = #{periodId} and ar.aud_taskid = #{taskId}
+		where ar.aud_perid = #{periodId} and ar.aud_taskid = #{taskId}
+		    and  t.org_status  = '0'
+		    and  t.org_is_cancel != '1'
+			and t.org_unique_id = #{uniqueId} or t.org_subjectionpid = #{uniqueId}
+			and ts.sco_taskid = ar.aud_taskid
+			and ts.sco_taskid = #{taskId}
+		order by t.org_level, t.org_administrative_code, t.org_budget_management_level, t.org_id, t.org_name
+	</select>
+
+	<select id="findCheckSubordinateTree" parameterType="map" resultType="net.greatsoft.core.dto.task.OrgDto">
+		select
+			t.ORG_ID as id,
+			t.ORG_UNIQUE_ID     	as uniqueId,
+			t.ORG_REGIONPID     	as regionPid,
+			t.ORG_Name            	as name,
+			t.ORG_SUBJECTIONPID   	as subjectionPid,
+			t.ORG_FILL_TYPE       	as fileType,
+			ar.aud_status       	as auditStatus,
+			ar.aud_summary_status  	as summaryStatus
+		from org t
+				 inner join task_scope ts
+							on t.org_id = ts.sco_orgid
+				 inner join audit_record ar
+							on t.org_id = ar.aud_orgid  and ts.sco_taskid = #{taskId} and ar.aud_perid = #{periodId}
+		where
+			ar.aud_perid = #{periodId} and ar.aud_taskid = #{taskId}
+		    and  t.org_status  = '0'
+		    and  t.org_is_cancel != '1'
+			and t.org_subjectionpid = #{uniqueId}
+			and ts.sco_taskid = ar.aud_taskid
+			and ts.sco_taskid = #{taskId}
+		order by t.org_level, t.org_administrative_code, t.org_budget_management_level, t.org_id, t.org_name
+	</select>
+
+
+	<!---删除机构-->
+	<delete id="deleteOrg" parameterType="String">
+		  delete from org where org_id = #{orgId}
+	</delete>
+
+	<select id="findHzNb" resultType="Integer" parameterType="String">
+		select count(1) from IHZBB_B1@wlzbdata where USERID_ = #{orgId}
+	</select>
+
+	<insert id="insertHzNb"  parameterType="net.greatsoft.core.domain.model.system.Org">
+		insert into #{tableName}@wlzbdata(BBQ_,USERID_,BTYPE_, SHTAG_,SHTAG2_,OPTION_,E5, E6,E7,E8,E9,E10,E11,E12,E13,B15,F15,B16,F16,B17,F17,B18,D18,F18,B19,F19,B20,F20,B21)
+		values('2018----',upper(#{uniqueId}),'0','0','0','0', #{orgName} /*E5*/,'',
+		 '','',#{prepaper},#{telephone},#{address},#{postalCode},'', /*E13*/
+		 #{healthCategory},#{budgetCode},#{administrativeCode},
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't2'
+			and t.dic_id = #{budgetManagementLevel}), /*F16*/
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't9'
+			and t.dic_id = #{category}), /*B17*/
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't4'
+			and t.dic_id = #{fillFactor}), /*F17*/
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't5'
+			and t.dic_id = #{fileType}), /*B18*/
+		 '', /*D18*/
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't6'
+			and t.dic_id = #{hospitalGrade}),
+		 #{regionPid},
+		<choose>
+			<when test="isInteGration == '0' or isInteGration == 0">
+				'否',
+			</when>
+			<when test="isInteGration == '1' or isInteGration == 1">
+				'是',
+			</when>
+			<otherwise>
+				'',
+			</otherwise>
+		</choose>
+		 (select t.dic_name
+		  from dic t
+		  where t.dic_type = 't8'
+			and t.dic_id = #{quality}),#{reserveCode},#{financialAccounting});
+	</insert>
+	<!--<update id="updateFb">
+		update #{tableName}@wlzbdata
+		set e5  = v_org_name,
+			e9  = v_org_preparer,
+			e10 = v_org_telephone,
+			e11 = v_org_address,
+			e12 = v_org_postal_code,
+			b15 = v_org_health_category,
+			f15 = v_org_budget_code,
+			b16 = v_org_administrative_code,
+			f16 =
+				(select t.dic_name
+				 from dic t
+				 where t.dic_type = 't2'
+				   and t.dic_id = v_ORG_BUDGET_MANAGEMENT_LEVEL),
+			b17 =
+				(select t.dic_name
+				 from dic t
+				 where t.dic_type = 't9'
+				   and t.dic_id = v_org_category),
+			f17 =
+				(select t.dic_name
+				 from dic t
+				 where t.dic_type = 't4'
+				   and t.dic_id = v_org_fill_factor),
+			b18 =
+				(select t.dic_name
+				 from dic t
+				 where t.dic_type = 't5'
+				   and t.dic_id = v_org_fill_type),
+			f18 =
+				(select t.dic_name
+				 from dic t
+				 where t.dic_type = 't6'
+				   and t.dic_id = v_org_hospital_grade),
+			b19 = v_org_regionpid,
+			f19 = v_org_is_integration,
+			b20 = v_org_quality,
+			f20 = v_org_reserve_code,
+			b21 = v_org_financial_accounting
+		where USERID_ = v_org_unique_id;
+	</update>-->
+	<select id="getTemplateIp" parameterType="map" resultType="String">
+		select t.template 
+		from POSTALCODE_TEMPLATE_REL t
+		where t.postalcode = #{postalCode} and t.task_id = #{taskId}
+ 	</select>
+</mapper>

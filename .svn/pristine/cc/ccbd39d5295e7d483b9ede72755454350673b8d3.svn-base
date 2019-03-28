@@ -1,0 +1,14 @@
+#\u65B0\u7586
+#system.indexUrl =http://220.171.11.10:9081/pos/authorize?client_id=4de8b23ed62a422a9fc07dd2cfb7d661&client_key=2e4271c7197f4910930f24ec639cd7e0&response_type=code&redirect_uri=http://114.247.234.149:8080/s-report/login/index
+#system.openplatformTokenUrl=http://220.171.11.10:9081/pos/token?grant_type=authorization_code&redirect_uri=http://114.247.234.149:8080/s-report/login/index&client_id=4de8b23ed62a422a9fc07dd2cfb7d661&client_key=2e4271c7197f4910930f24ec639cd7e0
+#system.openplatformSessionUrl=http://220.171.11.10:9081/pos/sessions
+#system.redirectUrl =http://114.247.234.149:8080/c-report
+#login.url1=http://220.171.11.10:9081/pos/token?grant_type=authorization_code&redirect_uri=http://114.247.234.149:8080/s-report/login/index&client_id=4de8b23ed62a422a9fc07dd2cfb7d661&client_key=2e4271c7197f4910930f24ec639cd7e0
+
+#\u6CB3\u5317
+system.indexUrl=http://106.37.72.238:8090/passport/oauth/authorize?client_id=testcw&response_type=code&scope=all
+system.getToken=http://106.37.72.238:8090/passport/oauth/token?grant_type=authorization_code&redirect_uri=http://192.168.1.214:8081/s-report/login/index&client_id=testcw&client_secret=1qaz
+system.usersUrl=http://106.37.72.238:8090/passport/users
+system.redirectUrl =http://192.168.1.214:5050/c-report
+
+#http://106.37.72.238:8090/passport/cwjg.html

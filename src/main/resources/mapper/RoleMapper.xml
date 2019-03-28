@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.RoleMapper">
+	<resultMap id="roleResultMap" type="net.greatsoft.core.domain.model.system.Role">
+		<id property="id" column="ROLE_ID" jdbcType="VARCHAR" />
+		<result property="name" column="ROLE_NAME" jdbcType="VARCHAR" />
+		<result property="flag" column="ROLE_SLUG" jdbcType="VARCHAR" />
+		<result property="type" column="ROLE_TYPE" jdbcType="NUMERIC" />
+		<result property="remark" column="REMARKS" jdbcType="VARCHAR" />
+		<result property="description" column="DESCRIPTION" jdbcType="VARCHAR" />
+		<result property="isValid" column="IS_VALID" jdbcType="NUMERIC" />
+		<result property="createUserId" column="CREATE_USERS" jdbcType="VARCHAR" />
+		<result property="createTime" column="CREATE_TIME" jdbcType="TIMESTAMP" />
+		<result property="updateUserId" column="UPDATE_USERS" jdbcType="VARCHAR" />
+		<result property="updateTime" column="UPDATE_TIME" jdbcType="TIMESTAMP" />
+	</resultMap>
+	<!-- 根据用户id查询角色信息 -->
+	<select id="findRoleByUsersId" parameterType="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Role">
+		select r.role_id as id,r.role_name as name,r.role_slug as flag,
+		r.role_type as type,r.is_valid as isValid
+		from role r,users_role ur,users u
+		where r.role_id = ur.role_id
+		and ur.users_id = u.users_id
+		and u.users_id = #{usersId,jdbcType=VARCHAR}
+	</select>
+	<select id="queryRoleByRoleIdList" parameterType="map" resultMap="roleResultMap">
+		select distinct r.role_id,
+						r.role_name,
+						r.role_slug,
+						r.role_type,
+						r.remarks,
+						r.description,
+						r.is_valid,
+						r.create_users,
+						r.create_time,
+						r.update_users,
+						r.update_time
+			from role r  inner join role_scope rs on r.role_id = rs.role_id_ed 
+			<where>
+				<if test="ids != null and ids != ''">
+					rs.role_id in
+					<foreach item="item" index = "index" collection="ids" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+			</where>
+	</select>
+
+
+	<!--批量导入开放注册平台-->
+	<insert id="insertBatchUsersRole" useGeneratedKeys="false" parameterType="java.util.List">
+		insert all
+		<foreach collection="list" item="usersInfo" index="index" >
+			into users_role (USERS_ID, ROLE_ID)
+			values(
+			#{usersInfo.id,jdbcType=VARCHAR},#{usersInfo.roleId,jdbcType=VARCHAR}
+			)
+		</foreach>
+		select 1 from dual
+
+	</insert>
+
+	<delete id="deleteAllUsersRole">
+		delete from users_role where users_id != '1'
+	</delete>
+
+	<insert id="insertUsersRoleFromOpen">
+		insert into users_role (USERS_ID, ROLE_ID)
+		select t1.USERS_INFO_ID, decode(t2.REPORT_TYPE_CODE, '01', '5', '3') from
+		USERS_INFO@openRegistry t1, org@openRegistry t2
+		where t1.org_id = t2.org_id  
+		and USERS_TYPE in ('2', '3')
+		and APPROVE_STATUS = '2'
+	</insert>
+</mapper>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.RoleMapper">
+	<!-- 根据用户id查询角色信息 -->
+	<select id="findRoleByUsersId" parameterType="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Role">
+		select r.role_id as roleId,r.role_name as roleName,r.role_slug as roleSlug,
+		r.org_id as orgId,r.role_type as roleType,r.is_valid as isValid
+		from role r,users_role ur,users u
+		where r.role_id = ur.role_id
+		and ur.users_id = u.users_id
+		and u.users_id = #{usersId,jdbcType=VARCHAR}
+	</select>
+</mapper>

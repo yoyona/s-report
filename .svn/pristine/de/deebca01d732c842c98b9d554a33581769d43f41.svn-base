@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.AnalysisMapper">
+	<sql id="ind_list">
+		T.STA_ID,T.STA_CODE,T.STA_ROWNAME,T.STA_COLUMN,T.STA_NAME,T.STA_TABLENAME,
+		T.STA_TABLENAME,T.STA_ROWNAME,T.STA_YEAR,T.STA_SHEETID,T.STA_COL,T.STA_ROW
+	</sql>
+	<!-- 根据sheet页id查询指标 -->
+	<select id="queryIndsBySheetId" parameterType="java.util.Map" resultType="map">
+	    select
+		<include refid="ind_list" />
+	    from STANDARD_INDICE t
+		where t.sta_sheetid = #{sheetId} 
+		and t.sta_year = #{year}
+		<!-- and t.sta_isanalysis = '1' -->
+		order by t.sta_code
+	</select>
+	<!-- 查询所有sheet页名称 -->
+	<select id="queryIndsSheetIds" parameterType="java.util.Map" resultType="map">
+	    select t.sta_sheetid,t.sta_table 
+	    from STANDARD_INDICE t
+		where t.sta_year = #{year}
+		and t.sta_taskid = #{taskId}
+		group by t.sta_sheetid,t.sta_table
+		order by t.sta_sheetid
+	</select>
+	<!-- 查询当年填报数据 -->
+	<select id="queryCurrentYearDatas" parameterType="java.util.Map" resultType="map">
+	   	${sql}
+	</select>
+	<insert id="insertDatas" parameterType="java.util.Map" useGeneratedKeys="false">
+	    ${insertSql}
+	</insert>
+	<delete id="deleteDatas" parameterType="java.util.Map">
+	    ${deleteSql}
+	</delete>
+	<select id="queryDatas" parameterType="java.util.Map" resultType="map">
+	     ${querySql}
+	</select>
+	<update id="updateDatas" parameterType="java.util.Map">
+	    ${updateSql}
+	</update>
+	<!-- 指标数据导入结束 -->
+	
+	
+	<!-- 指标数据查询开始（指标数据与导入的指标数据不同表） -->
+	<select id="queryStandardIndices" parameterType="java.util.Map" resultType="map">
+	   	select t.sta_id,t.sta_code,t.sta_name,t.sta_des,t.sta_type,t.sta_table,t.sta_column
+	   	from STANDARD_INDICE_ANALYSIS t
+		where t.sta_code in (${indiceIds})
+	</select>
+	<!-- 查询表列表 t.sta_tablename -->
+	<select id="queryTablesName" parameterType="java.util.Map" resultType="map">
+	    <!-- select t.sta_table as id,sta_tablename as name
+	    from STANDARD_INDICE_ANALYSIS t 
+	    where t.sta_taskid = #{taskId}
+	    group by t.sta_table,t.sta_tablename 
+	    order by t.sta_tablename -->
+	    select sta_tablename as name,sta_tablename as id
+	    from STANDARD_INDICE_ANALYSIS t 
+	    where t.sta_taskid = #{taskId}
+	    group by t.sta_tablename
+	    order by t.sta_tablename
+	</select>
+	<!-- 查询横向行名 -->
+	<select id="queryRowsName" parameterType="java.util.Map" resultType="map">
+	    <!-- select t.sta_row_order,sta_tablename as PID,nvl(t.sta_table,t.sta_table_summary) as tablename, t.sta_rowname as name, sta_tablename || '_' || t.sta_rowname as ID
+	    from STANDARD_INDICE_ANALYSIS t
+		where t.sta_tablename = #{table}
+		group by t.sta_rowname,nvl(t.sta_table,t.sta_table_summary),t.sta_row_order,sta_tablename
+		order by t.sta_row_order -->
+		select t.sta_row_order,sta_tablename as PID,t.sta_tablename as tablename, t.sta_rowname as name, sta_tablename || '_' || t.sta_rowname as ID
+	    from STANDARD_INDICE_ANALYSIS t
+		where t.sta_tablename = #{table}
+		group by t.sta_rowname,t.sta_row_order,sta_tablename
+		order by t.sta_row_order
+	</select>
+	<!-- 查询纵向列名 -->
+	<select id="queryColumnsName" parameterType="java.util.Map" resultType="map">
+	    <!-- select t.sta_id as id,t.sta_code,t.sta_rowname,t.sta_column,t.sta_name as name,t.sta_tablename
+	    from STANDARD_INDICE_ANALYSIS t
+		where (t.sta_table = #{table} or t.sta_table_summary = #{table})
+		and t.sta_rowname = #{row}
+		order by t.sta_code -->
+		select t.sta_id as id,t.sta_code,t.sta_rowname,t.sta_column,t.sta_name as name,t.sta_tablename
+	    from STANDARD_INDICE_ANALYSIS t
+		where t.sta_tablename = #{table}
+		and t.sta_rowname = #{row}
+		order by t.sta_code
+	</select>
+	<select id="queryIndices" parameterType="java.util.Map" resultType="map">
+	    select t.sta_name,t.sta_des,t.sta_formula,t.sta_origin,t.sta_standard 
+		from STANDARD_INDICE_ANALYSIS t
+		<!-- where t.sta_isanalysis = '1' -->
+		<if test="indName != null and indName != ''">
+			where t.sta_name like '%'||#{indName}||'%'
+		</if>
+	</select>
+	<select id="getQueryParam" parameterType="java.util.Map" resultType="map">
+	    select t.par_id,t.par_name,t.par_orgId,t.par_des,t.par_createuserid,t.par_createtime 
+		from QUERY_PARAM t
+		left join users u on t.par_createuserid = u.users_id
+    	where u.admin_org_id in 
+    	(
+			select o.org_id from org o 
+		    where o.org_fill_type = '01'
+		    or o.org_id=#{orgId}
+		    <if test="fillType == '4' or fillType == '5' ">
+				and o.org_budget_management_level in ('2','3','4','5')
+			</if>
+			<if test="fillType == '3'">
+				and o.org_budget_management_level in ('2','3')
+			</if>
+			<if test="fillType == '2'">
+				and o.org_budget_management_level in ('2')
+			</if>
+		    start with o.org_id=#{orgId} connect by prior o.org_subjectionpid=o.org_unique_id
+		)
+		<if test="parName != null and parName != ''">
+			and t.par_name like '%'||#{parName}||'%'
+		</if>
+		<if test="isLocal != null and isLocal == false">
+			and t.par_createuserid in (select u.users_id from users u where u.admin_org_id = #{orgId})
+		</if>
+		order by t.par_createtime
+	</select>
+	<select id="queryStandardIndicesAnalysis" parameterType="java.util.Map" resultType="map">
+	   	select t.sta_id,t.sta_code,t.sta_name,t.sta_des,t.sta_type,t.sta_table,t.sta_column,t.sta_table_summary,t.sta_column_summary
+	   	from STANDARD_INDICE_ANALYSIS t
+		where t.sta_year = #{year}
+		and t.sta_taskid = #{taskId}
+		and (t.sta_column is not null or t.sta_column_summary is not null)
+		and t.sta_id in (${indiceIds})
+		<if test="isSummary != null and isSummary == '1'">
+			and t.sta_row_order is not null
+		</if>
+		<if test="isSummary != null and isSummary == '0'">
+			and t.sta_row_order is null
+		</if>
+		order by to_number(t.sta_id)
+	</select>
+</mapper>

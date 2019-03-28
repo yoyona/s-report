@@ -1,0 +1,174 @@
+/*
+ * 版权所有 2019 冠新软件。
+ * 保留所有权利。
+ */
+package net.greatsoft.core.service.task;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import net.greatsoft.core.domain.mapper.QueryParamIndRelMapper;
+import net.greatsoft.core.domain.mapper.TaskExecuteMapper;
+import net.greatsoft.core.domain.model.task.Period;
+import net.greatsoft.core.domain.model.task.QueryParam;
+import net.greatsoft.core.repository.task.PeriodRepository;
+import net.greatsoft.core.repository.task.QueryParamRepository;
+
+/**
+ * TODO 填写描述信息
+ * @since 2019-1-4
+ */
+@Service
+public class AnalysisService {
+	//系统年份
+	@Value("${system.year}")
+	private String year;
+	
+	@Autowired
+	private TaskExecuteMapper taskExcuteMapper;
+	
+	@Autowired
+	private QueryParamRepository queryParamRepository;
+	
+	@Autowired
+	private QueryParamIndRelMapper queryParamIndRelMapper;
+	
+	@Autowired
+	private PeriodRepository periodRepository;
+	
+	/**
+	 * 查询年度填报数据
+	 * @param orgIds
+	 * @param indiceIds
+	 * @return
+	 * @since 2018-10-23
+	 */
+	public List<Map<String, Object>> queryCurrentYearDatas(List<String> orgIds,List<String> indiceIds,String perId) {
+		Period per = periodRepository.findPeriodByPeriodId(Long.valueOf(perId));
+		
+		perId = per.getParamName();
+		Map<String,Object> param = new HashMap<String,Object>();
+		StringBuffer sbOrgIds  = new StringBuffer();
+		for (int i = 0; i < orgIds.size(); i++) {
+			sbOrgIds.append("','").append(orgIds.get(i));
+		}
+		StringBuffer sbIndiceIds  = new StringBuffer();
+		for (int i = 0; i < indiceIds.size(); i++) {
+			sbIndiceIds.append("','").append(indiceIds.get(i));
+		}
+		param.put("year", year);
+		param.put("taskId", per.getTaskId());
+		param.put("orgIds", sbOrgIds.toString().replaceFirst("',", "")  + "'");
+		param.put("indiceIds", sbIndiceIds.toString().replaceFirst("',", "") + "'");
+		//key对应STANDARD_INDICE表中的表名，value对应列名
+		Map<String,Object> tables = new HashMap();
+		//查询标准指标信息
+		List<Map<String, Object>> indices = this.taskExcuteMapper.queryStandardIndicesAnalysis(param);
+		if(indices.size() == 0){
+			return null;
+		}
+		Map<String, Object> indice = null;
+		String columns = "";
+		String oldColumns = "";
+		for (int i = 0; i < indices.size(); i++) {
+			indice = indices.get(i);
+			if(!tables.containsKey((String)indice.get("STA_TABLE"))){
+				columns = (String)indice.get("STA_COLUMN");
+				tables.put((String)indice.get("STA_TABLE"), columns);
+			}else{
+				oldColumns = (String)tables.get((String)indice.get("STA_TABLE"));
+				columns = oldColumns + "," + (String)indice.get("STA_COLUMN");
+				tables.put((String)indice.get("STA_TABLE"), columns);
+			}
+		}
+		
+		StringBuffer sbTable = new StringBuffer();
+		StringBuffer sbOn = new StringBuffer();
+		int t = 0;
+		for (String key : tables.keySet()) { 
+		  // System.out.println("Key = " + key); 
+		  columns = (String)tables.get(key);
+		  sbTable.append("( select o.org_id,o.org_name,o.ORG_ADMINISTRATIVE_CODE,o.ORG_FILL_TYPE,o.ORG_CATEGORY,o.ORG_BUDGET_MANAGEMENT_LEVEL,o.ORG_HOSPITAL_GRADE,").append(columns)
+		  		 .append(" from org o")
+		  		 .append(" left join ").append(key).append("@WLZBDATA t on t.userid_ = o.org_id ").append("and ").append("t.bbq_ = '").append(perId).append("'")
+		  		 .append(" where o.org_id in (")
+		  		 .append(sbOrgIds.toString().replaceFirst("',",""))
+		  		 .append("') ) t" + t++);
+		  if(t > 1){
+			  sbTable.append(" on ").append("t").append(t-2).append(".org_id = t").append(t-1).append(".org_id");
+		  }
+		  if(t != tables.keySet().size()){
+			  sbTable.append(" full join ");
+		  }
+		}
+		
+		/*if(t > 1){
+			sbOn.append(" on ");
+			for (int i = 0; i < t - 1; i++) {
+				sbOn.append("t").append(i).append(".org_id = t").append(t==1?0:i+1).append(".org_id");
+				if(i != t - 2){
+					sbOn.append(" and ");
+				}
+			}
+		}*/
+		String orderby = " order by t0.ORG_FILL_TYPE,t0.ORG_ADMINISTRATIVE_CODE";
+		StringBuffer sql = new StringBuffer();
+		sql.append("select * from ").append(sbTable.toString()).append(sbOn.toString()).append(orderby);
+//		System.out.println(">>>>> " + sql.toString());
+		param.put("sql", sql.toString());
+		List<Map<String, Object>> object = this.taskExcuteMapper.queryCurrentYearDatas(param);
+		return object;
+	}
+	
+	/**
+	 * 原表查询明细信息
+	 * @param parId
+	 * @return
+	 * @since 2019-1-4
+	 */
+	public Map<String,Object> getQueryParamById(String parId){
+		QueryParam qp = queryParamRepository.findQueryParamById(parId);
+		List<Map<String,Object>> piList = queryParamIndRelMapper.getQueryParamIndRelByParId(parId);
+		Map<String,Object> piMap = new HashMap<>();
+		Map pi = null;
+		Map node = null;
+		//组织已选指标层级结构
+		for (int i = 0; i < piList.size(); i++) {
+			pi = piList.get(i);
+			//表名
+			if(!piMap.containsKey((String) pi.get("STA_TABLENAME"))){
+				node = new HashMap();
+				node.put("ID", (String)pi.get("STA_TABLE"));
+				node.put("NAME", (String)pi.get("STA_TABLENAME"));
+				node.put("PID", 0);
+				piMap.put((String) pi.get("STA_TABLENAME"), node);
+			}
+			//行名
+			if(!piMap.containsKey((String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME"))){
+				node = new HashMap();
+				node.put("ID", (String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME"));
+				node.put("NAME", (String)pi.get("STA_ROWNAME"));
+				node.put("PID", (String)pi.get("STA_TABLE"));
+				piMap.put((String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME"), node);
+			}
+			//具体指标
+			if(!piMap.containsKey((String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME") + (String)pi.get("REL_INDID"))){
+				node = new HashMap();
+				node.put("ID", (String)pi.get("REL_INDID"));
+				node.put("PID", (String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME"));
+				node.put("NAME", pi.get("STA_NAME"));
+				piMap.put((String)pi.get("STA_TABLE") + "_" + (String)pi.get("STA_ROWNAME") + (String)pi.get("REL_INDID"), node);
+			}
+		}
+		Map<String, Object> result = new HashMap<String, Object>();
+		result.put("inds", piMap.values());
+		result.put("qp", qp);
+		result.put("piList", piList);
+		return result;
+	}
+}

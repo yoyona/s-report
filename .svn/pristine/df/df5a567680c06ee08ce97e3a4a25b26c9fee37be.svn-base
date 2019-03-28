@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TemplateInfoMapper">
+	
+	<!-- 通过任务Id和机构 来删除模板信息 -->
+	<delete id="deleteByTaskIdAndOrgId" parameterType="String">
+		delete from TEMPLATE_INFO where tem_taskid=#{taskId} <!-- and tem_orgid=#{orgId}  -->
+	</delete> 
+	<!-- 通过条件查询模板信息 -->
+	<select id="getTemplateByCondition" resultType="net.greatsoft.core.domain.model.task.TemplateInfo" parameterType="hashmap">
+		select 
+			t.tem_id as id,
+			t.tem_templateid as templateId,
+			t.tem_taskid as taskId,
+			t.tem_type as templateType
+			from template_info t
+			<where>
+				<if test="taskId != null and taskId != ''">
+					and t.tem_taskid = #{taskId}
+				</if>
+				<if test="templateType !=nul and templateType != ''">
+					and t.tem_type = #{templateType}
+				</if>
+			</where>
+	</select>
+	<select id="list" resultType="net.greatsoft.core.domain.model.task.TemplateInfo" parameterType="hashmap">
+		select 
+			t.tem_id as id,
+			t.tem_templateid as templateId,
+			t.tem_diagnosisid as diagnosisId,
+			t.tem_analysisid as analysisId,
+			t.tem_taskid as taskId,
+			t.tem_type as templateType,
+			d.dic_name as templateName
+			from template_info t
+			left join dic d 
+			on t.tem_type  = d.dic_id
+			where <!-- d.dic_type = 't5' -->
+			t.tem_taskid = #{taskId}
+			<!-- <if test="taskId != null and taskId != ''">
+				and t.tem_taskid = #{taskId}
+			</if> -->
+			<if test="templateType !=nul and templateType != ''">
+				and t.tem_type = #{templateType}
+			</if>
+	</select>
+</mapper>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ The MIT License (MIT)
+  ~
+  ~ Copyright (c) 2014-2016 abel533@gmail.com
+  ~
+  ~ Permission is hereby granted, free of charge, to any person obtaining a copy
+  ~ of this software and associated documentation files (the "Software"), to deal
+  ~ in the Software without restriction, including without limitation the rights
+  ~ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  ~ copies of the Software, and to permit persons to whom the Software is
+  ~ furnished to do so, subject to the following conditions:
+  ~
+  ~ The above copyright notice and this permission notice shall be included in
+  ~ all copies or substantial portions of the Software.
+  ~
+  ~ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  ~ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  ~ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  ~ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  ~ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  ~ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  ~ THE SOFTWARE.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.TaskMapper">
+	
+	<!-- 根据条件查询任务信息列表 -->
+	<select id="findAllTasks" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.task.Task">
+		select
+	       t.task_id as id,
+	       t.task_des as des,
+	       t.task_name as name,
+	       decode(t.task_type,'0','月报','1','季报','2','年报','9','自定义','未知') AS type,
+	       decode(t.task_allocation_type,'0','统一分配','1','逐级分配') as allocationType,
+	       to_char(t.task_startdate,'yyyy-mm-dd hh:mm:ss') as startDate,
+	       to_char(t.task_enddate,'yyyy-mm-dd hh:mm:ss') as endDate,
+	       decode(t.task_status,'0','发布','1','暂存','2','开启','9','删除','未知') AS status,
+	       to_char(t.task_createtime,'yyyy-mm-dd hh24:mi:ss') as createTime,
+	       t.task_createuserid as createUserId
+	  	from Task t 
+	  		<where>
+	  			<!-- 任务名称 -->
+	  			<if test="name !=null and name != ''">
+		  			and t.task_name = #{name,jdbcType=VARCHAR}
+		  		</if>
+		  		<!-- 分配方式 -->
+			  	<if test="allocationType !=null and allocationType != ''">
+			  		and t.task_allocation_type = #{allocationType,jdbcType=VARCHAR}
+			  	</if>
+			  	<!-- 任务类型 -->
+			  	<if test="type !=null and type != ''">
+			  		and t.task_type = #{type,jdbcType=VARCHAR}
+			  	</if>
+			  	<!-- 任务状态 -->
+			  	<if test="status !=null and status != ''">
+			  		and t.task_status = #{status,jdbcType=VARCHAR}
+			  	</if>
+			  	<!-- 任务开始时间和结束时间 -->
+			  	<if test="startDate !=null and startDate != ''">
+			  		<![CDATA[
+			  		and t.task_startdate >= #{startDate,jdbcType=Date}
+			  		 ]]> 
+			  	</if>
+			  	<if test="endDate !=null and endDate != ''">
+			  		<![CDATA[
+			  		and t.task_enddate <= #{endDate,jdbcType=Date}
+			  		 ]]> 
+			  	</if>
+	  		</where>
+		  	
+	</select>
+	<!-- 修改任务信息 -->
+	<update id="updateTask" parameterType="net.greatsoft.core.domain.model.task.Task">
+		update task 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="orgId != null and orgId != ''">task_orgid = #{orgId},</if>
+			<if test="name != null and name != ''">task_name = #{name},</if>
+			<if test="startdate != null and startdate != ''">task_startdate = #{startdate},</if>
+			<if test="enddate != null and enddate != ''">task_enddate = #{enddate},</if>
+			<if test="allocationType != null and allocationType != ''">task_allocation_type = #{allocationType},</if>
+			<if test="des != null and des != ''">task_des = #{des},</if>
+			<if test="type != null and type != ''">task_type = #{type},</if>
+			<if test="status != null and status != ''">task_status = #{status},</if>
+			<if test="createetime != null and createetime != ''">task_createtime = #{createetime},</if>
+			<if test="createuserid != null and createuserid != ''">task_createuserid = #{createuserid},</if>
+		</trim>	
+		where task_id = #{id}
+	</update>
+</mapper>

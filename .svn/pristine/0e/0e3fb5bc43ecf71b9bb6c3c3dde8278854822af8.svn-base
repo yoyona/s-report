@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.DicMapper">
+	<!-- 查询字典表信息 -->
+	<select id="findDics" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Dic">
+		select  '0' || '_' || t.type_id as  id,t.type_name as name,'' as pId,'' as des,0 as "order",'' as type,'' as isValid,t.type_id as dicPidName from DIC_TYPE t
+		union all 
+		select d.dic_id as id,d.dic_name as name,d.dic_pid as pId,d.dic_des as des,d.dic_order as "order",d.dic_type as type,d.dic_isvalid as isValid,'' as dicPidName		
+		from dic d
+	</select>
+	<update id="updateDic" parameterType="net.greatsoft.core.domain.model.system.Dic">
+	    update dic 
+		<trim prefix="set" suffixOverrides=",">
+			<if test="name != null and name != ''">DIC_NAME = #{name},</if>
+			<if test="pId != null and pId != ''">DIC_PID = #{pId},</if>
+			<if test="des != null and des != ''">DIC_DES = #{des},</if>
+			<if test="order != null">DIC_ORDER = #{order},</if>
+			<if test="isValid != null">DIC_ISVALID = #{isValid},</if>
+		</trim>
+		where dic_id = #{id} and dic_type = #{type} 
+	</update>
+	<insert id="insertDic" useGeneratedKeys="false" parameterType="net.greatsoft.core.domain.model.system.Dic">
+	    insert into dic
+	    	(DIC_ID,DIC_NAME,DIC_PID,DIC_DES,DIC_TYPE,DIC_ISVALID,DIC_ORDER)
+	    	values(
+   			#{id,jdbcType=VARCHAR},
+   			#{name,jdbcType=VARCHAR},
+   			#{pId,jdbcType=VARCHAR},
+   			#{des,jdbcType=VARCHAR},
+   			#{type,jdbcType=VARCHAR},
+   			#{isValid,jdbcType=VARCHAR},
+   			#{order,jdbcType=VARCHAR}
+	    	)		
+	</insert> 
+	<delete id="deleteDic" parameterType="net.greatsoft.core.domain.model.system.Dic">
+	    delete dic where DIC_ID = #{id} and DIC_TYPE = #{type}
+	</delete>
+	<!-- 通过字典表类型查询对应的字典表信息,并且将code和名称合并到一起 -->
+	<select id="findDictByCondition" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Dic">
+		select 
+			t.dic_id as id,
+			<!-- t.dic_name as name, -->
+			t.dic_id || '-' || dic_name as name,
+			t.dic_pid as pId,
+			t.dic_des as des,
+			t.dic_order as "order",
+			t.dic_type as type,
+			t.dic_isvalid as  isValid
+			from dic t
+			<where>
+				<if test="type != null and type != ''">
+					and t.dic_type = #{type}
+				</if>
+			</where>
+			order by t.dic_order
+	</select>
+</mapper>

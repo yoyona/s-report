@@ -1,0 +1,741 @@
+package net.greatsoft.core.web.system;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.*;
+
+import com.alibaba.fastjson.JSON;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+
+import net.greatsoft.application.common.domain.util.ObjectClone;
+import net.greatsoft.core.domain.mapper.AuditRecordMapper;
+import net.greatsoft.core.domain.mapper.NoticeMapper;
+import net.greatsoft.core.domain.mapper.TaskMapper;
+import net.greatsoft.core.domain.mapper.TaskScopeMapper;
+import net.greatsoft.core.domain.model.system.DicArea;
+import net.greatsoft.core.domain.model.system.Org;
+import net.greatsoft.core.domain.model.system.OrgHistory;
+import net.greatsoft.core.domain.model.system.Role;
+import net.greatsoft.core.domain.model.system.User;
+import net.greatsoft.core.domain.model.task.AuditRecord;
+import net.greatsoft.core.domain.model.task.FileAdditional;
+import net.greatsoft.core.domain.model.task.Task;
+import net.greatsoft.core.domain.model.task.TaskScope;
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.dto.task.OrgDto;
+import net.greatsoft.core.repository.redis.CacheRedisDao;
+import net.greatsoft.core.repository.system.DicAreaRepository;
+import net.greatsoft.core.repository.task.TaskRepository;
+import net.greatsoft.core.service.notice.NoticeService;
+import net.greatsoft.core.service.system.BankOrganizationService;
+import net.greatsoft.core.service.system.OrgService;
+import net.greatsoft.core.service.system.RoleService;
+import net.greatsoft.core.service.system.SynchronizationService;
+import net.greatsoft.core.service.system.SystemService;
+import net.greatsoft.core.service.system.UserService;
+import net.greatsoft.core.util.CommonUtils;
+import net.greatsoft.core.util.constant.ExecuteConstant;
+import net.greatsoft.core.util.constant.MessageConstant;
+import net.greatsoft.core.util.constant.SystemConstant;
+import net.greatsoft.core.web.BaseController;
+import net.greatsoft.core.web.dto.ResultDto;
+
+/**
+ * 机构控制层
+ * @author GoingToSick
+ * @Date  2017-02-22 16:40
+ */
+@RestController
+@RequestMapping(value="/org")
+public class OrgController extends BaseController{
+	
+	@Autowired
+	private OrgService orgService;
+	
+	@Autowired
+	private TaskRepository taskRepository;
+	
+	@Autowired
+	private TaskMapper taskMapper;
+	
+	@Autowired
+	private BankOrganizationService bankOrganizationService;
+	
+	
+	@Autowired
+	private CacheRedisDao cacheRedisDao;
+	
+	@Autowired
+	private DicAreaRepository dicAreaRepository;
+	
+	
+	@Autowired
+	private SystemService systemService;
+	
+	@Autowired
+	private RoleService roleService;
+	
+	@Autowired
+	private UserService userService;
+	
+	@Autowired
+	private NoticeMapper noticeMapper;
+	
+	@Autowired
+	private NoticeService noticeService;
+	@Autowired
+	private SynchronizationService synchronizationService;
+	
+	//机构顶级节点ID
+	@Value("${orgPid}")
+	private String orgPid;
+
+	/**
+	 * 任务范围机构树
+	 * @return
+	 */
+	@PostMapping(value="/showTree")
+	public ResultDto showTree(@RequestBody(required = false) Map<String, Object> map,HttpServletRequest request){
+		String auditType = map != null && map.get("auditType") != null ? JSON.parseObject(JSON.toJSONString(map.get("auditType")),String.class) : "";
+		String orgId = map != null && map.get("orgId") != null ? JSON.parseObject(JSON.toJSONString(map.get("orgId")),String.class) : this.orgPid;
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", orgId);
+		param.put("auditType", auditType);
+		// 行政区划代码
+		param.put("administrativeCode", map != null && map.get("administrativeCode") != null ? map.get("administrativeCode") : null);
+		List<Org> treeList = orgService.showTree(param);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",treeList);
+	}
+
+	/**
+	 * 延迟加载树,需要返回传入机构所在的级别和下一级别的机构信息
+	 * @param orgId
+	 * @return
+	 */
+	@GetMapping(value="/getDelayTree")
+	public List<Org> getDelayTree(String orgId){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", orgId);
+		if (!SystemConstant.TOP_ORG_ID.equals(orgId)) {
+			return this.orgService.showTree(param);
+		}
+		return this.orgService.getDelayTree(orgId);
+		// return this.orgService.showTree(param);
+	}
+
+	/**
+	 * 延迟加载树
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/getDelayTree")
+	public List<Org> getDelayTree(@RequestBody Map<String, Object> map){
+		String auditType = map != null && map.get("auditType") != null ? JSON.parseObject(JSON.toJSONString(map.get("auditType")),String.class) : "";
+		String orgId = map != null && map.get("orgId") != null ? JSON.parseObject(JSON.toJSONString(map.get("orgId")),String.class) : this.orgPid;
+		String fileType = map != null && map.get("fileType") != null && map.get("fileType") != "" ? JSON.parseObject(JSON.toJSONString(map.get("fileType")),String.class) : "";
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("fileType", fileType);
+		param.put("orgId",orgId);
+		param.put("auditType",auditType);
+		// 行政区划代码
+		param.put("administrativeCode", map != null && map.get("administrativeCode") != null && map.get("administrativeCode") != ""? map.get("administrativeCode") : null);
+		String taskId = (String) (map != null && map.get("taskId") != null && map.get("taskId") != "" ? map.get("taskId") : null);
+		if(!StringUtils.isEmpty(taskId)){
+			Task task = this.taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+			if (task != null) {
+				param.put("auditType", task.getAuditType());
+			}
+		}
+		if (!SystemConstant.TOP_ORG_ID.equals(orgId)) {
+			return this.orgService.showTree(param);
+		}
+		return this.orgService.getDelayTree(param);
+	}
+
+	/**
+	 * 延迟加载树
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/tree/delay")
+	public List<Org> findDelayTree(@RequestBody Map<String, Object> map){
+		return this.orgService.getDelayTree(map);
+	}
+
+	/**
+	 * 审核延迟加载树(第一层展示)
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/tree/check/delay/top")
+	public List<Org> findCheckTreeTop(@RequestBody Map<String, Object> map){
+		return this.orgService.findCheckTreeTop(map);
+	}
+
+	/**
+	 * 审核延迟加载树下拉
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/tree/check/delay/subordinate")
+	public List<Org> findCheckSubordinateTree(@RequestBody Map<String, Object> map){
+		return this.orgService.findCheckSubordinateTree(map);
+	}
+
+	@GetMapping(value="/getSubordinateData")
+	public List<Org> getSubordinateData(String uniqueId){
+		return orgService.getSubordinateData(uniqueId);
+	}
+	
+	@PostMapping(value="/getSubordinateDataMap")
+	public List<Org> getSubordinateData(@RequestBody Map<String, Object> map){
+		return orgService.getSubordinateData(map);
+	}
+	/**
+	 * 通过id查询机构信息
+	 * @param id
+	 * @return
+	 */
+	@RequestMapping(value = "/get/{id}", method = RequestMethod.GET)
+	public ResultDto get(@PathVariable String id) {
+		Org org = this.orgService.getOrgById(id);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"成功",org);
+	}
+
+	/**
+	 * 通过机构唯一id查询机构信息
+	 * @param id
+	 * @return
+	 */
+	@RequestMapping(value = "/get/unique/{id}", method = RequestMethod.GET)
+	public ResultDto getOrgByUniqueId(@PathVariable String id) {
+		Org org = this.orgService.getOrgByUniqueId(id);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"成功",org);
+	}
+	
+	/**
+	 * 获取审核机构树
+	 * @param map
+	 * @param request
+	 * @return
+	 */
+	// 备注: 加入uniqueId 配合机构批复成功后的变化
+	@PostMapping(value="/checkTree")
+	public ResultDto getCheckTree(String orgId,Long periodId,Long taskId,String uniqueId,HttpServletRequest request){
+		//获取任务信息
+		Task task = taskRepository.findTaskByTaskId(taskId);
+		List<OrgDto> treeList = orgService.getCheckTree(orgId,periodId,task.getAuditType(),taskId,uniqueId);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",treeList);
+		
+	}
+
+	/**
+	 * 从缓存中命中树的信息
+	 * @return
+	 */
+	@GetMapping(value="/getCacheTree")
+	public List<Org> getCacheTree(){
+		List<Org> treeList = orgService.getCacheTree();
+		return treeList;
+	}
+
+	/**
+	 * 新增金融机构
+	 */
+	@RequestMapping(value = "/saveBankOrganization", method = RequestMethod.POST)
+	public ResultDto saveBankOrganization(
+			@RequestBody Org bankOrganization,
+			HttpSession session) {
+		bankOrganizationService.saveBankOrganization(bankOrganization,
+				getCurrentUser(session));
+		return success("success");
+	}
+
+	/**
+	 * 更新金融机构
+	 *//*
+	@RequestMapping(value = "/updateBankOrganization", method = RequestMethod.POST)
+	public ResultDto updateBankOrganization(
+			@RequestBody Org bankOrganization,
+			HttpSession session) {
+		Org bankOrganization1 = bankOrganizationService
+				.updateBankOrganization(bankOrganization,
+						getCurrentUser(session));
+		return success(bankOrganization1);
+	}
+
+	*//**
+	 * 根据id删除金融机构
+	 *//*
+	@RequestMapping(value = "/delete/{id}", method = RequestMethod.POST)
+	public ResultDto deleteBankOrganization(@PathVariable String id) {
+		bankOrganizationService.deleteBankOrganization(id);
+		return success("success");
+	}*/
+	
+	
+	/**
+	 * 根据条件查询金融机构
+	 */
+	@RequestMapping(value = "/findBankOrganization/{pageNo}/{pageSize}", method = RequestMethod.POST)
+	public ResultDto findBankOrganization(
+			@RequestBody Map<String, Object> params, @PathVariable int pageNo,
+			@PathVariable int pageSize) {
+		Page<Org> page = PageHelper.startPage(pageNo, pageSize);
+		bankOrganizationService.findBankOrganization(params);
+
+		Map<String, Object> result = new HashMap<>();
+		result.put("pageNo", page.getPageNum());// 当前页
+		result.put("pageSize", page.getPageSize());// 每页显示的行数
+		result.put("total", page.getTotal());// 总条数
+		result.put("rows", page.getResult());// 查询到的结果
+		result.put("pages", page.getPages());// 总页数
+		return success(result);
+	}
+
+	/**
+	 * 查询全部金融机构
+	 */
+	@RequestMapping(value = "/findBankOrg", method = RequestMethod.POST)
+	public ResultDto findAllBankOrg() {
+		List<Org> list = bankOrganizationService.findAllBankOrg();
+		return success(list);
+	}
+
+	/**
+	 * 修改机构信息
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/update")
+	public ResultDto update(@RequestBody Org org,HttpServletRequest request){
+		Map<String,Object> result = new HashMap<String,Object>();
+		//update的时候需要更新更新时间,和更新操作人 
+		org.setUpdateTime(new Date());
+		UserDto user = getCachedUserDto(request);
+		org.setUpdateUserId(user.getId());
+		Org update = this.orgService.update(org);
+//		// 同步到orgHistory中
+//		OrgHistory orgHistory = new OrgHistory();
+//		ObjectClone.copy(orgHistory,update);
+//		this.orgService.add(orgHistory);
+//		result.put("message", "修改成功");
+		result.put("org", update);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+
+	/**
+	 * 新增机构信息
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/add")
+	public ResultDto add(@RequestBody Map<String,Object> param,HttpServletRequest request){
+		
+		Map<String,Object> result = new HashMap<String,Object>();
+		Org org = JSON.parseObject(JSON.toJSONString(param.get("org")),Org.class);
+		String password = String.valueOf(param.get("password"));
+		//判断是否有重复的机构名称或者机构唯一标识
+		Org orgByName = this.orgService.getOrgByName(org.getName());
+		if (orgByName != null) {
+			return new ResultDto(ResultDto.CODE_FAIL,"该机构名称已存在",null);
+		}
+		Org orgByUniqueId = this.orgService.getOrgByUniqueId(org.getUniqueId());
+		if (orgByUniqueId != null) {
+			return new ResultDto(ResultDto.CODE_FAIL,"该机构唯一标识有重复",null);
+		}
+		org.setCreateDate(new Date());
+		Org add = this.orgService.add(org);
+		// 同步到orgHistory中
+		OrgHistory orgHistory = new OrgHistory();
+		ObjectClone.copy(orgHistory,add);
+		this.orgService.insertOrgHistoryWithInId(orgHistory);
+		// 同时新增用户 如果是主管机构那么生成用户的两个角色应该是主管机构管理员和主管机构填报用户, 如果是基层机构, 就是基层机构管理员和基层机构填报用户
+		User user = new User();
+		user.setAdminOrganizationId(org.getUniqueId());
+		user.setName(org.getName());
+		user.setPassword(CommonUtils.encrypt(password));
+		user.setPasswordSalt("123456");
+		user.setCreateTime(new Date());
+		user.setType(1);
+		user.setRealName(org.getName());
+		user.setOrgName(org.getName());
+		user.setIsValid(1);
+		user.setIsCancel(0);
+		Set<Role> roles = new HashSet<Role>();
+		String fillType = org.getFileType();
+		if ("01".equals(fillType)) {
+			Role roleCharge = roleService.findRoleById(SystemConstant.CHARGE_ROLE_ID);
+			if (roleCharge != null) {
+			   roles.add(roleCharge);	
+			}
+			Role roleChargeFill = roleService.findRoleById(SystemConstant.CHARGE_ROLE_FILL_ID);
+			if (roleChargeFill != null) {
+				roles.add(roleChargeFill);
+			}
+		} else {
+			Role roleBasic = roleService.findRoleById(SystemConstant.BASIC_ROLE_ID);
+			if (roleBasic != null) {
+			   roles.add(roleBasic);	
+			}
+			Role roleBasicFill = roleService.findRoleById(SystemConstant.BASIC_ROLE_FILL_ID);
+			if (roleBasicFill != null) {
+				roles.add(roleBasicFill);
+			}
+		}
+		user.setRoles(roles);
+		userService.save(user);
+		result.put("message", "保存成功");
+		result.put("org", add);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+
+	/**
+	 * 删除机构
+	 * @return
+	 */
+	@PostMapping(value="/delete")
+	public ResultDto delete(@RequestBody Org org,HttpServletRequest request){
+		//判断是否有下级机构,否则不让删除
+		Integer count = this.orgService.getCountBySubjectionPid(org.getUniqueId());
+		if (count > 0) {
+			return new ResultDto(ResultDto.CODE_FAIL,"该机构存在下级机构,请先删除下级所有机构再删除该机构",null);
+		}
+		
+		org.setUpdateTime(new Date());
+		org.setStatus("1");
+		UserDto user = getCachedUserDto(request);
+		org.setUpdateUserId(user.getId());
+		Org delete = this.orgService.delete(org);
+		Map<String,Object> result = new HashMap<String,Object>();
+		result.put("org", delete);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"删除成功",result);
+	}
+	
+	@PostMapping(value="/deleteOrg")
+	public ResultDto deleteOrg(@RequestBody Map<String,Object> map){
+		List<String> orgIds = (List<String>) map.get("orgIds");
+		for (int i = 0; i < orgIds.size(); i++) {
+			String string = JSON.toJSONString(orgIds.get(i));
+			if(StringUtils.isEmpty(string)){
+				continue;
+			}
+			this.orgService.deleteOrg("9",Long.valueOf(string));
+		}
+		Map<String,Object> result = new HashMap<String,Object>();
+		result.put("message", "删除成功");
+		return new ResultDto(ResultDto.CODE_SUCCESS,"删除成功",result);
+	}
+	
+	/**
+	 * 根据行政区划代码查询机构列表
+	 * @param param
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	@PostMapping(value="/query")
+	public ResultDto query(@RequestBody Map<String, Object> param){
+		String code = (String)param.get("code");
+		//List<Org> orgs = orgRepository.getOrgsByAdministrativeCode(code);
+		List<Org> orgs = (List<Org>) cacheRedisDao.get(code);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"",orgs);
+	}
+	
+	/**
+	 * 机构维护 提交操作
+	 * @param map
+	 * @return
+	 * @Descript:
+	 */
+	@PostMapping(value="/repaly/submit")
+	public ResultDto repalyOrg(@RequestBody Map<String, Object> map,HttpServletRequest request){
+		Map<String,Object> result = new HashMap<String,Object>();
+		Map<String,Object> param = new HashMap<String,Object>();
+		OrgHistory orgHistory = JSON.parseObject(JSON.toJSONString(map.get("orgHistory")),OrgHistory.class);
+		param.put("status", "9");
+		param.put("uniqueId",orgHistory.getUniqueId());
+		// 判断是否有待批复的机构信息
+		Integer count = this.orgService.getCountOfHistory(param);
+		if (count > 0) {
+			return new ResultDto(ResultDto.CODE_FAIL,"当前已经提交过修改申请,请不要重复提交",null);
+		}
+		// 判断是否有驳回的历史信息  只会有一条
+		param.put("status", "10");
+		List<OrgHistory> list = this.orgService.list(param);
+		if (list != null && list.size() > 0) {
+			orgHistory.setId(list.get(0).getId());
+		}
+		orgHistory.setStatus("9");
+		OrgHistory add = null;
+		// 如果有驳回记录不必新增一条新的记录
+		if (list != null && list.size() > 0) {
+			add = this.orgService.add(orgHistory);
+		} else {
+			add = this.orgService.insertOrgHistory(orgHistory);
+		}		
+		//保存文件
+		if (map.get("files") != null) {
+			List<String> fileListStr = (List<String>) map.get("files");
+			// List<FileAdditional> fileList =  new ArrayList<FileAdditional>();
+			if(fileListStr != null && fileListStr.size() > 0){
+				for (int i = 0; i < fileListStr.size(); i++) {
+					String string = JSON.toJSONString(fileListStr.get(i));
+					if(StringUtils.isEmpty(string)){
+						continue;
+					}
+					FileAdditional fileAdditional = JSON.parseObject(string,FileAdditional.class);
+					fileAdditional.setOrgId(String.valueOf(add.getId()));
+					this.orgService.saveFile(fileAdditional);
+					//fileList.add(fileAdditional);
+				}
+			}
+			
+		}
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+
+	/**
+	 * 查询待批复已经上传的文件列表
+	 * @param orgId
+	 * @return
+	 */
+	@GetMapping(value="/reply/file/uniqueId")
+	public ResultDto  replyFileListByUniqueId(String uniqueId){
+		List<FileAdditional> fileList = this.orgService.replyFileListByUniqueId(uniqueId);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",fileList);
+	}
+	
+	/**
+	 * 根据机构历史记录的机构id来查询附件列表
+	 * @param orgId
+	 * @returncvc
+	 */
+	@GetMapping(value="/reply/file/orgId")
+	public ResultDto  replyFileListByOrgId(String orgId){
+		List<FileAdditional> fileList = this.orgService.replyFileListByOrgId(orgId);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",fileList);
+	}
+
+	/**
+	 * 查询待批复的机构信息(org_history表里面待批复的机构记录)
+	 * @return
+	 */
+	@PostMapping(value="/reply/list/{pageNo}/{pageSize}")
+	public ResultDto replyList(@RequestBody Map<String, Object> map,@PathVariable Integer pageNo,@PathVariable Integer pageSize,HttpServletRequest request){
+		Page<OrgHistory> page = PageHelper.startPage(pageNo, pageSize);
+		//获取当前登录用户
+		UserDto user = getCachedUserDto(request);
+		map.put("orgId", user.getAdminOrganizationId());
+		List<OrgHistory> list = this.orgService.list(map);
+		Map<String,Object> result = new HashMap<String,Object>();
+		result.put("pageNo", page.getPageNum());
+		result.put("pageSize",page.getPageSize());
+		result.put("total", page.getTotal());
+		result.put("rows", page.getResult());
+		result.put("pages", page.getPages());
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+
+	/**
+	 * 审核通过
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/reply/pass")
+	public ResultDto replyPass(@RequestBody Map<String, Object> map){
+		OrgHistory orgHistory = JSON.parseObject(JSON.toJSONString(map.get("orgHistory")),OrgHistory.class);
+		//OrgHistory orgHistoryO = this.orgService.getOrgHistoryByUniqueId(orgHistory.getUniqueId());
+		Map<String,Object> result = new HashMap<String,Object>();
+		//查询是否有生效的数据,如果有的话就更新为历史数据
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("status", "0");
+		param.put("uniqueId",orgHistory.getUniqueId());
+		OrgHistory o1 = null;
+		List<OrgHistory> list = this.orgService.list(param);
+		if (list != null && list.size() > 0) {
+			for (int i = 0; i < list.size(); i++) {
+				OrgHistory  o = list.get(i);
+				o.setStatus("1");
+				o1 = this.orgService.add(o);
+			}
+		}
+		// 将当前的机构信息更新到本来的机构表里面记录信息
+		Org org = this.orgService.getOrgByUniqueId(orgHistory.getUniqueId());
+		String id = org.getId();
+		String status = org.getStatus();
+		
+		// 更新这条机构为生效状态
+		orgHistory.setStatus("0");
+		this.orgService.add(orgHistory);
+		// 批复成功后修改任务信息表,审核记录表,任务范围表里面的机构数据为批复成功后的机构历史表里面的id
+		this.orgService.doChange(orgHistory.getId(),orgHistory.getUniqueId());
+		ObjectClone.copy(org,orgHistory);
+		org.setStatus(status);
+		org.setId(String.valueOf(orgHistory.getId()));
+		this.orgService.updateOrg(org);
+		// 更新缓存
+		String areaCode = org.getAdministrativeCode();
+		flushCached(areaCode);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+
+	/**
+	 * 审核驳回
+	 * @param map
+	 * @return
+	 */
+	@PostMapping(value="/reply/rject")
+	public ResultDto replyRject(@RequestBody Map<String, Object> map,HttpServletRequest request){
+		OrgHistory orgHistory = JSON.parseObject(JSON.toJSONString(map.get("orgHistory")),OrgHistory.class);
+		Map<String,Object> result = new HashMap<String,Object>();
+		orgHistory.setStatus("10");
+		this.orgService.add(orgHistory);
+		//驳回后发送系统通知
+		UserDto user = getCachedUserDto(request);
+		List<String> userIds = noticeMapper.findUsersByOrgId(String.valueOf(orgHistory.getUniqueId()));
+		noticeService.sendMessage(null,String.valueOf(user.getAdminOrganizationId()), MessageConstant.SUBJECT_UPDATE_ORG_MSG, userIds, user,null);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"驳回成功",result);
+	}
+
+	/**
+	 * 查询指定机构下的任务信息和表期提示信息
+	 * @param orgId
+	 * @return
+	 */
+	@GetMapping(value="/checkUpdate/{orgId}")
+	public ResultDto checkUpdate(@PathVariable String orgId){
+		String message = this.orgService.queryTP(orgId);
+		Map<String,Object> result = new HashMap<String,Object>();
+		result.put("message", message);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"驳回成功",result);
+	}
+	
+	private void flushCached(String areaCode){
+		// 首先刷新区域的机构列表
+		List<Org> orgList = orgService.getOrgsByAdministrativeCode(areaCode);
+		cacheRedisDao.remove(areaCode);
+		cacheRedisDao.set(areaCode, orgList);
+		if (areaCode.endsWith("0000")) {
+				List<Org> orgsByProvinces = this.orgService.getOrgsByProvinces(areaCode.substring(0, 2));
+				cacheRedisDao.remove(areaCode.substring(0, 2)+"%");
+				cacheRedisDao.set(areaCode.substring(0, 2)+"%", orgsByProvinces);
+				// 获取机构下面的县或者其他什么的
+				List<DicArea> queryAreas = systemService.queryAreas(areaCode);
+				for (int j = 0; j < queryAreas.size(); j++) {
+					DicArea area = queryAreas.get(j);
+					// 查询下级的的机构放入缓存
+					List<Org> orgsByProvinces2 = orgService.getOrgsByProvinces(area.getId().substring(0, 4));
+					cacheRedisDao.remove(area.getId().substring(0, 4)+"_");
+					cacheRedisDao.set(area.getId().substring(0, 4)+"_", orgsByProvinces2);
+				}
+		} else {
+			DicArea areaT = this.dicAreaRepository.findOne(areaCode);	 
+			while (!areaT.getpId().endsWith("0000")) {
+				areaT = this.dicAreaRepository.findOne(areaT.getpId());
+			}
+			List<Org> orgsByProvinces = this.orgService.getOrgsByProvinces(areaT.getId().substring(0, 2));
+			cacheRedisDao.remove(areaT.getId().substring(0, 2)+"%");
+			cacheRedisDao.set(areaT.getId().substring(0, 2)+"%", orgsByProvinces);
+			// 获取机构下面的县或者其他什么的
+			List<DicArea> queryAreas = systemService.queryAreas(areaT.getId());
+			for (int j = 0; j < queryAreas.size(); j++) {
+				DicArea area = queryAreas.get(j);
+				// 查询下级的的机构放入缓存
+				List<Org> orgsByProvinces2 = orgService.getOrgsByProvinces(area.getId().substring(0, 4));
+				cacheRedisDao.remove(area.getId().substring(0, 4)+"_");
+				cacheRedisDao.set(area.getId().substring(0, 4)+"_", orgsByProvinces2);
+			}
+		}
+	}
+
+	/**
+	 * 通过机构Id查询机构历史数据
+	 * @param orgId
+	 * @return
+	 */
+	@GetMapping(value="/orgHistory/get/{orgId}")
+	public ResultDto findOrgHistory(@PathVariable Long orgId){
+		OrgHistory orgHistory = this.orgService.getOrgHistoryByOrgId(orgId);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"成功",orgHistory);
+	}
+	
+	@PostMapping(value="/statisticsScopeTree")
+	public ResultDto statisticsScopeTree(@RequestBody Map<String, Object> map){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", map != null && map.get("orgId") != null && map.get("orgId") != ""? map.get("orgId") : this.orgPid);
+		String taskId = (String) (map != null && map.get("taskId") != null && map.get("taskId") != ""? map.get("taskId") : null);
+		param.put("taskId", taskId);
+		Task task = this.taskRepository.findTaskByTaskId(Long.valueOf(taskId));
+		param.put("auditType",task.getAuditType());
+		List<Map<String, Object>> statisticsScopeTree = this.orgService.statisticsScopeTree(param);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",statisticsScopeTree);
+	}
+	
+	@PostMapping(value="/findOrgAgentTree")
+	public ResultDto findOrgAgentTree(@RequestBody Map<String, Object> map){
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("orgId", map != null && map.get("orgId") != null ? map.get("orgId") : null);
+		param.put("userId", map != null && map.get("userId") != null ? map.get("userId") : null);
+		List<Org> treeList = orgService.findOrgAgentTree(param);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",treeList);
+	}
+
+	/**
+	 * 获取历史机构档案机构树信息
+	 * @param orgId
+	 * @param year
+	 * @return
+	 */
+	@GetMapping(value = "/history/detail/tree")
+	public ResultDto findHistoryDetailTree(@RequestParam(required = false) String orgId, String year) {
+		List<Map<String, Object>> treeList = this.orgService.findHistoryDetailTree(orgId, year);
+		return new ResultDto(ResultDto.CODE_SUCCESS, "获取成功", treeList);
+	}
+	
+	/**
+	 * 注册系统同步机构信息
+	 * @param map
+	 * @param request
+	 * @return
+	 * @since 2018-12-18
+	 */
+	@PostMapping(value = "/syn/org")
+    public Map<String, Object> synOrg(@RequestBody Map<String, Object> map,HttpServletRequest request) {
+		String type = (String)map.get("type");
+		List<Map<String,Object>> orgList = (List)map.get("orgList");
+		Map<String,Object> result = synchronizationService.sysOrg(type, orgList);
+        return result;
+    }
+
+
+	/**
+	 * 修改上级机构信息
+	 * @param org
+	 * @param request
+	 * @return
+	 */
+	@PostMapping(value="/update/changeTopOrg")
+	public ResultDto changeTopOrg(@RequestBody Org org,HttpServletRequest request){
+		Map<String,Object> result = new HashMap<String,Object>();
+		Org orgTop = orgService.getOrgById(org.getId());
+		orgTop.setId(org.getId());
+		orgTop.setRegionPid(org.getSubjectionPid());
+		orgTop.setSubjectionPid(org.getSubjectionPid());
+		Org update = this.orgService.update(orgTop);
+		result.put("org", update);
+		return new ResultDto(ResultDto.CODE_SUCCESS,"获取成功",result);
+	}
+}

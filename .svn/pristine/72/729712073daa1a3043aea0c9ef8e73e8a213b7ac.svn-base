@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.NoticeMapper">
+	<resultMap type="net.greatsoft.core.domain.model.system.Notice" id="noticeMap">
+		<id     column="not_id" 		property="id"/>
+		<result column="not_orgid" 		property="orgId"/>
+		<result column="not_title" 		property="title"/>
+		<result column="not_taskid" 	property="taskId"/>
+		<result column="not_type" 		property="type"/>
+		<result column="not_status" 	property="status"/>
+		<result column="not_category" 		property="category"/>
+		<result column="not_createuserid" property="createUserId"/>
+		<result column="not_createtime" property="createTime"/>
+		<result column="not_content" property="content"/>
+	</resultMap>
+	
+	<resultMap type="net.greatsoft.core.domain.model.system.Notice" id="noticeMapRerod">
+		<id     column="not_id" 		property="id"/>
+		<result column="not_orgid" 		property="orgId"/>
+		<result column="not_title" 		property="title"/>
+		<result column="not_taskid" 	property="taskId"/>
+		<result column="not_type" 		property="type"/>
+		<result column="not_status" 	property="status"/>
+		<result column="not_category" 		property="category"/>
+		<result column="not_createuserid" property="createUserId"/>
+		<result column="not_createtime" property="createTime"/>
+		<result column="not_content" property="content"/>
+		<result column="not_content" property="content"/>
+		<collection property="attachments" ofType="net.greatsoft.core.domain.model.task.Attachment" column="id">
+			<id column="aid" property="id"/><!-- 这里的column对应的是下面查询的别名，而不是表字段名 -->
+			<result column="aorgId" property="orgId"/><!-- property对应JavaBean中的属性名 -->
+			<result column="acreateUserId" property="createUserId"/>
+			<result column="acreateTime" property="createTime"/>
+			<result column="acreateDate" property="createDate"/>
+			<result column="afileUrl" property="fileUrl"/>
+			<result column="afileName" property="fileName"/>
+			<result column="astatus" property="status"/>
+			<result column="aindicatorId" property="indicatorId"/>
+			<result column="ayear" property="year"/>
+			<result column="acategory" property="category"/>
+			<result column="atype" property="type"/>
+			<result column="anotId" property="notId"/>
+		</collection>
+
+	</resultMap>
+	
+	<sql id="select">
+		not_id,not_orgid,not_title,not_taskid,not_type,not_status,not_category,not_createuserid,not_createtime,not_content
+	</sql>
+	<!-- 根据条件查询消息列表 -->
+	<select id="queryNoticeListByOrgId" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Notice">
+		select n.not_id id,n.not_orgid orgId,n.not_title title,n.not_taskid taskId,n.not_type type,n.not_status status,n.not_category category,n.not_createuserid createUserId,n.not_createtime createTime 
+		from notice n,task_scope ts 
+		where n.not_taskid = ts.sco_taskid and ts.sco_orgid = '1'
+	</select>
+	<select id="findByCondition" parameterType="map" resultMap="noticeMap">
+		select <include refid="select"/>
+			from notice
+			<where>
+				<if test="title != null and title != ''">
+					and not_title like '%'|| #{title} ||'%'
+				</if>
+				<if test="category != null and category != ''">
+					and not_category = #{category}
+				</if>
+				<if test="status != null and status != ''">
+					and not_status = #{status}
+				</if>
+				<if test="categoryList != null and categoryList.size > 0">
+					and not_category in
+					<foreach item="item" index = "index" collection="categoryList" open="(" separator="," close=")">
+						#{item}
+					</foreach>
+				</if>
+			</where>
+			order by not_createtime desc
+	</select>
+	<select id="findUsersByTaskId" parameterType="String" resultType="String">
+		select to_char(u.users_id) userId 
+		from TASK_SCOPE t,users u,org o
+		where t.sco_taskid = #{taskId}
+		and t.sco_orgid = o.org_id
+		and o.org_unique_id = u.admin_org_id
+		and u.user_type = '1'
+	</select>
+	<select id="findUsersByOrgId" parameterType="String" resultType="String">
+		select to_char(u.users_id) as userId
+		from  users u
+		where u.admin_org_id = #{orgId}
+		<!-- and u.user_type = '1' -->
+	</select>
+	<delete id="deleteById" parameterType="String">
+		delete from notice where not_id = #{id}
+	</delete>
+	<!-- 插入消息用户关系表信息 -->
+	<insert id="insertNoticeUserRel" parameterType="java.util.List">
+		insert all 
+	    <foreach collection="list" item="item" index="index" >
+	     into NOTICE_USER_REL
+	    	(NOT_ID,USER_ID,IS_READ, TYPE)
+	    	values(
+   			#{item.notId,jdbcType=VARCHAR},
+   			#{item.userId,jdbcType=VARCHAR},
+   			#{item.isRead,jdbcType=VARCHAR},
+   			#{item.type,jdbcType=VARCHAR}
+	    	)		
+	    </foreach>
+	    select * from dual 
+	</insert>
+	<!-- 查询单条通知公告,关联机构 -->
+	<select id="findById" parameterType="String" resultType="net.greatsoft.core.domain.model.system.Notice">
+		select 
+			n.not_id id,
+			o.org_name orgName,
+			n.not_orgid orgId,
+			n.not_title title,
+			n.not_taskid taskId,
+			n.not_type type,
+			n.not_status status,
+			n.not_category category,
+			n.not_createuserid createUserId,
+			n.not_createtime createTime,
+			n.not_content content
+		from notice n left join org o on n.not_orgid = o.org_id 
+		where  not_id = #{id} 
+	</select>
+	<!-- 查询指定用户的的消息列表 -->
+	<select id="findByUserId" parameterType="map" resultType="net.greatsoft.core.domain.model.system.Notice">
+		select 
+			n.not_id id,
+			o.org_name orgName,
+			n.not_orgid orgId,
+			n.not_title title,
+			n.not_taskid taskId,
+			n.not_type type,
+			n.not_status status,
+			n.not_category category,
+			n.not_createuserid createUserId,
+			n.not_createtime createTime,
+			n.not_content content,
+			nr.is_read as readStatus
+		from notice n  
+			left join notice_user_rel nr on n.not_id = nr.not_id
+			left join org o on n.not_orgid = o.org_id 
+			where n.not_category = '0' and n.not_status = '0'
+				<if test="isRead != null and isRead != ''">
+					and nr.is_read = #{isRead}
+				</if>
+				<if test="userId != null and userId != ''">
+					and nr.user_id = #{userId}
+				</if>
+			order by to_number(nr.is_read),n.not_createtime desc
+	</select>
+	<!-- 已读 -->
+	<update id="updateNoticeUserRel" parameterType="map">
+		update notice_user_rel set is_read = '1' where not_id = #{notId} and user_id = #{userId}
+	</update>
+	
+	<!-- 初始化数据 -->
+	<insert id="initNoticeReacordRel" parameterType="String">
+		insert into notice_user_rel
+	    	(not_id, user_id, is_read, type)  select #{notId} as not_id, users_id, '0', '1'  from USERS t where t.user_type != 5
+	</insert>
+	
+	<!-- 统计用户未读的通知数 -->
+	<select id="findUserNoticeRecordCount" parameterType="String" resultType="Integer">
+		select count(1) from notice_user_rel nr 
+			left join notice t on nr.not_id = t.not_id
+		 	where nr.type = '0' 
+				and nr.USER_ID = #{usreId}  
+				and nr.is_read = '0'
+				and nr.is_read = '0'
+				and t.not_category = '0'
+				and t.not_status = '0'
+	</select>
+	
+	<select id="findNoticeRecord" parameterType="map" resultMap="noticeMapRerod">
+	select
+		n.not_id,
+		n.not_orgid,
+		n.not_title,
+		n.not_taskid,
+		n.not_type,
+		n.not_status,
+		n.not_category,
+		nr.is_read as not_createuserid,
+		n.not_createtime,
+		n.not_content,
+		a.att_id as "aid",
+		a.att_orgid as "aorgId",
+		a.att_create_userid as "acreateUserId",
+		a.att_not_id as "aid",
+		a.att_status as "astatus",
+		a.att_indicator_id as "aindicatorId",
+		a.att_year as "ayear",
+		a.att_category as "acategory",
+		a.att_type as "atype",
+		a.ATT_CREATE_TIME as "acreateTime",
+		to_char(a.ATT_CREATE_TIME, 'yyyy-MM-dd HH24:mi:ss') as "acreateDate",
+		a.ATT_FILE_URL as "afileUrl",
+		a.ATT_FILE_NAME as "afileName"
+		from  notice n left join attachment a
+		on n.not_id = a.ATT_NOT_ID
+		left join notice_user_rel nr
+		on n.not_id = nr.not_id
+		where n.not_status = '0' 
+		and  nr.user_id = #{userId}
+		and n.not_category = '2'
+		<!-- <if test="categoryList != null and categoryList.size > 0">
+			and n.not_category in
+			<foreach item="item" index = "index" collection="categoryList" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+		<if test="category != null and category != ''">
+			and n.not_category = #{category}
+		</if>
+		<if test="userId != null and userId != ''">
+			and nr.user_id = #{userId}
+		</if> -->
+		order by n.not_createtime desc
+	</select>
+	
+	<!-- 通知公告下载文件类型 -->
+	<select id="findNoticeRecordFile" parameterType="map" resultMap="noticeMapRerod">
+	select
+		n.not_id,
+		n.not_orgid,
+		n.not_title,
+		n.not_taskid,
+		n.not_type,
+		n.not_status,
+		n.not_category,
+		n.not_createtime,
+		n.not_content,
+		a.att_id as "aid",
+		a.att_orgid as "aorgId",
+		a.att_create_userid as "acreateUserId",
+		a.att_not_id as "aid",
+		a.att_status as "astatus",
+		a.att_indicator_id as "aindicatorId",
+		a.att_year as "ayear",
+		a.att_category as "acategory",
+		a.att_type as "atype",
+		a.ATT_CREATE_TIME as "acreateTime",
+		to_char(a.ATT_CREATE_TIME, 'yyyy-MM-dd HH24:mi:ss') as "acreateDate",
+		a.ATT_FILE_URL as "afileUrl",
+		a.ATT_FILE_NAME as "afileName"
+		from  notice n left join attachment a
+		on n.not_id = a.ATT_NOT_ID
+		where n.not_status = '0' 
+		and n.not_category = '3'
+		<!-- <if test="categoryList != null and categoryList.size > 0">
+			and n.not_category in
+			<foreach item="item" index = "index" collection="categoryList" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+		<if test="userId != null and userId != ''">
+			and nr.user_id = #{userId}
+		</if> -->
+		order by n.not_createtime desc
+	</select>
+</mapper>

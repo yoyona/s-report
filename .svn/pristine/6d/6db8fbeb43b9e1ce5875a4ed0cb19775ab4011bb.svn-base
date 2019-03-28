@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.ResourcesMapper">
+	<resultMap id="BaseResultMap" type="net.greatsoft.core.domain.model.system.Resources" >
+    <id column="resources_id" property="resourcesId" jdbcType="VARCHAR" />
+    <result column="resources_pid" property="resourcesPid" jdbcType="VARCHAR" />
+    <result column="resources_name" property="resourcesName" jdbcType="VARCHAR" />
+    <result column="is_valid" property="isValid" jdbcType="VARCHAR" />
+    <result column="resources_url" property="resourcesUrl" jdbcType="VARCHAR" />
+    <result column="resources_img" property="resourcesImg" jdbcType="VARCHAR" />
+    <result column="remarks" property="remarks" jdbcType="VARCHAR" />
+   <result column="serial_no" property="serialNo" jdbcType="DECIMAL" />
+    <collection property="children" column="resources_id" javaType="arrayList" ofType="net.greatsoft.core.domain.model.system.Resources" select="findById"></collection>
+    </resultMap>
+	 <sql id="Base_Column_List" >
+	    resources_id, resources_pid, resources_name, resources_url, is_valid, resources_img, remarks
+  	</sql>
+  	<select id="findById" parameterType="java.lang.String" resultMap="BaseResultMap">
+	    select <include refid="Base_Column_List"/>
+	    from resources 
+	    where resources_pid = #{id,jdbcType=VARCHAR}
+	    order by serial_no asc 
+    </select>
+    <select id="findReasource" parameterType="java.lang.String" resultMap="BaseResultMap">
+	    select <include refid="Base_Column_List"/>
+	    from resources 
+	    where resources_pid = #{id,jdbcType=VARCHAR}
+	    order by serial_no asc 
+    </select>
+	<select id="findResourcesByUsersId" parameterType="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Resources">
+		select 
+			res.RESOURCES_ID as resourcesId,
+			res.RESOURCES_PID as resourcesPid,
+			res.RESOURCES_NAME as resourcesName,
+			res.IS_VALID as isValid,
+			res.RESOURCES_URL as resourcesUrl,
+			res.RESOURCES_IMG as resourcesImg,
+			res.REMARKS as   remarks,
+			res.SERIAL_NO as serialNo
+	      from resources res, role_resources rr,  role r,users_role ur,users u
+	      where res.resources_id = rr.resources_id 
+	      and rr.role_id = r.role_id 
+	      and r.role_id = ur.role_id
+	      and ur.users_id = u.users_id
+		  and u.users_id = #{usersId,jdbcType=VARCHAR}
+	</select>
+	<select id="findByResourcesId"  parameterType ="java.lang.String"  resultMap="BaseResultMap">
+		select <include refid="Base_Column_List"/>
+	    from resources 
+	    where resources_id = #{resourcesId,jdbcType=VARCHAR}
+	</select>
+	<select id="findByResources" parameterType="java.util.Map" resultType="net.greatsoft.core.domain.model.system.Resources">
+		select 
+			r.RESOURCES_ID as resourcesId,
+			r.RESOURCES_PID as resourcesPid,
+			r.RESOURCES_NAME as resourcesName,
+			r.IS_VALID as isValid,
+			r.RESOURCES_URL as resourcesUrl,
+			r.RESOURCES_IMG as resourcesImg,
+			r.REMARKS as   remarks,
+			r.SERIAL_NO as serialNo
+	      from resources r 
+	      where 1=1 
+	      	<if test="resourcesName !=null">
+	      		and r.RESOURCES_NAME = #{resourcesName,jdbcType=VARCHAR}
+	      	</if>
+	</select>
+	<select id="findResoursesByRoleId" parameterType ="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Resources">
+		select a.RESOURCES_NAME as resourcesName
+	    from resources a, role_resources b
+	    where a.resources_id = b.resources_id and b.ROLE_ID = #{roleId,jdbcType=VARCHAR}
+	</select>
+	<select id="findResoursesByRoleName" parameterType ="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Resources">
+		select a.RESOURCES_NAME as resourcesName
+	    from resources a, role_resources b, role c
+	    where a.resources_id = b.resources_id and b.ROLE_ID = c.ROLE_ID and c.ROLE_NAME = #{roleName,jdbcType=VARCHAR}
+	</select>
+	<select id="findResoursesIdByRoleId" parameterType ="java.lang.String" resultType="net.greatsoft.core.domain.model.system.Resources">
+		select 
+		a.RESOURCES_ID as resourcesId,
+		a.RESOURCES_PID as resourcesPid,
+		a.RESOURCES_NAME as resourcesName,
+		a.IS_VALID as isValid,
+		a.RESOURCES_URL as resourcesUrl,
+		a.RESOURCES_IMG as resourcesImg,
+		a.REMARKS as remarks,
+		a.SERIAL_NO as serialNo
+	    from resources a, role_resources b
+	    where a.RESOURCES_ID = b.RESOURCES_ID and b.ROLE_ID = #{roleId,jdbcType=VARCHAR}
+	</select>
+</mapper>

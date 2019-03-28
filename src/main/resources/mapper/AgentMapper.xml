@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.AgentMapper">
+
+	<select id="queryAgentUserList" parameterType="java.util.Map" resultType="java.util.Map">
+		select u.users_id,a.ao_name,to_char(u.create_time, 'yyyy-MM-dd') as create_time,u.user_name,u.mobile_phone,u.real_name 
+		from users u
+		left join agent_org a on u.admin_org_id = a.ao_id
+		left join user_agent ua on u.users_id = ua.agent_user_id
+		where u.is_agent = '1'
+		and ua.agent_org_id in (
+		select oh.org_id  from org oh
+		start with oh.org_unique_id = #{uniqueId}  and oh.org_status  = '0'
+		connect by prior oh.org_unique_id = oh.org_subjectionpid
+		)
+		group by u.users_id,a.ao_name,to_char(u.create_time, 'yyyy-MM-dd') ,u.user_name,u.mobile_phone,u.real_name
+	</select>
+	
+</mapper>

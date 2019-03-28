@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.OrgHistoryMapper">
+	<!-- 查询机构树的信息 -->
+	<resultMap type="net.greatsoft.core.domain.model.system.OrgHistory" id="orgHistoryResultMap">
+		<id     column="ORG_ID" 					  property="id"/>
+		<result column="ORG_UNIQUE_ID"       		  property="uniqueId"/>
+		<result column="ORG_REGIONPID"       		  property="regionPid"/>
+		<result column="ORG_SUBJECTIONPID"       	  property="subjectionPid"/>
+		<result column="ORG_NAME"       	          property="name"/>
+		<result column="ORG_CREATE_DATE"       		  property="createDate"/>
+		<result column="ORG_REPLY_DATE"       		  property="replyDate"/>
+		<result column="ORG_STATUS"       			  property="status"/>
+		<result column="ORG_ADDRESS"       			  property="address"/>
+		<result column="ORG_EMAIL"       	          property="email"/>
+		<result column="ORG_POSTAL_CODE"       		  property="postalCode"/>
+		<result column="ORG_TELEPHONE"       		  property="telephone"/>
+		<result column="ORG_ADMINISTRATIVE_CODE"      property="administrativeCode"/>
+		<result column="ORG_FILL_TYPE"                property="fileType"/>
+		<result column="ORG_FILL_FACTOR"              property="fillFactor"/>
+		<result column="ORG_ECONOMIC_TYPE_CODE"       property="economicTypeCode"/>
+		<result column="ORG_BUDGET_MANAGEMENT_LEVEL"  property="budgetManagementLevel"/>
+		<result column="ORG_CATEGORY"       		  property="category"/>
+		<result column="ORG_QUALITY"       			  property="quality"/>
+		<result column="ORG_CLASS_MANAGE_CODE"        property="classManageCode"/>
+		<result column="ORG_HOSPITAL_GRADE"           property="hospitalGrade"/>
+		<result column="ORG_SUMMARY_TYPE"             property="summaryType"/>
+		<result column="ORG_BUDGET_CODE"              property="budgetCode"/>
+		<result column="ORG_CEO"       				  property="ceo"/>
+		<result column="ORG_CFO"       				  property="cfo"/>
+		<result column="ORG_FINANCIAL_MANAGER"        property="financialManager"/>
+		<result column="ORG_PREPARER"                 property="prepaper"/>
+		<result column="ORG_HEALTH_CATEGORY"       	  property="healthCategory"/>
+		<result column="ORG_INCOMING_AND_OUTGOINGS"   property="incomingAndOutgoings"/>
+		<result column="ORG_CODE"                     property="code"/>
+		<result column="ORG_RESERVE_CODE"             property="reserveCode"/>
+		<result column="ORG_IS_CANCEL_MEDICINE"       property="isCancelMedicine"/>
+		<result column="ORG_IS_INTEGRATION"           property="isInteGration"/>
+		<result column="ORG_IS_CANCEL"                property="isCancel"/>
+		<result column="ORG_UPDATE_TIME"              property="updateTime"/>
+		<result column="ORG_UPDATE_USER_ID"           property="updateUserId"/>
+		<result column="ORG_LEVEL"                    property="orgLevel"/>
+		<result column="ORG_ADMINISTRATIVE_CATEGORY"  property="administrativeCategory"/>
+		<result column="ORG_FINANCIAL_ACCOUNTING"     property="financialAccounting"/>
+		<result column="ORG_ISWJW"                    property="isWjw"/>
+	</resultMap>
+	<sql id="org_list">
+		ORG_ID,ORG_UNIQUE_ID,ORG_REGIONPID,ORG_SUBJECTIONPID,ORG_NAME,ORG_CREATE_DATE,ORG_REPLY_DATE,
+		ORG_STATUS,ORG_ADDRESS,ORG_EMAIL,ORG_POSTAL_CODE,ORG_TELEPHONE,ORG_ADMINISTRATIVE_CODE,ORG_FILL_TYPE,
+		ORG_FILL_FACTOR,ORG_ECONOMIC_TYPE_CODE,ORG_BUDGET_MANAGEMENT_LEVEL,ORG_CATEGORY,ORG_QUALITY,ORG_CLASS_MANAGE_CODE,
+		ORG_HOSPITAL_GRADE,ORG_SUMMARY_TYPE,ORG_BUDGET_CODE,ORG_CEO,ORG_CFO,ORG_FINANCIAL_MANAGER,ORG_PREPARER,ORG_HEALTH_CATEGORY,
+		ORG_INCOMING_AND_OUTGOINGS,ORG_CODE,ORG_RESERVE_CODE,ORG_IS_CANCEL_MEDICINE,ORG_IS_INTEGRATION,ORG_IS_CANCEL,ORG_UPDATE_TIME,
+		ORG_UPDATE_USER_ID,ORG_LEVEL,ORG_ADMINISTRATIVE_CATEGORY,ORG_FINANCIAL_ACCOUNTING,ORG_ISWJW
+	</sql>
+	<sql id="org_list_Alias">
+		oh.org_id,oh.org_unique_id,oh.org_regionpid,oh.org_subjectionpid,oh.org_name,oh.org_create_date,oh.org_reply_date,
+		oh.org_status,oh.org_address,oh.org_email,oh.org_postal_code,oh.org_telephone,oh.org_administrative_code,oh.org_fill_type,
+		oh.org_fill_factor,oh.org_economic_type_code,oh.org_budget_management_level,oh.org_category,oh.org_quality,oh.org_class_manage_code,
+		oh.org_hospital_grade,oh.org_summary_type,oh.org_budget_code,oh.org_ceo,oh.org_cfo,oh.org_financial_manager,oh.org_preparer,oh.org_health_category,
+		oh.org_incoming_and_outgoings,oh.org_code,oh.org_reserve_code,oh.org_is_cancel_medicine,oh.org_is_integration,oh.org_is_cancel,oh.org_update_time,
+		oh.org_update_user_id,oh.org_level,oh.org_administrative_category,oh.org_financial_accounting,oh.org_iswjw
+	</sql>
+	<select id="list" parameterType="map" resultMap="orgHistoryResultMap">
+		select 
+			<include refid="org_list"></include>
+		from org_history
+		<where>
+			<if test="status != null and status != ''">
+				and org_status = #{status}
+			</if>
+			<if test="name != null and name != ''">
+				and org_name = #{name}
+			</if>
+			<if test="uniqueId != null and uniqueId != ''">
+				and org_unique_id = #{uniqueId}
+			</if>
+			<!-- 这儿的机构id是用户登录的机构信息,是唯一id.这儿的条件是查询登录用户机构下的机构 -->
+			<if test="orgId != null and orgId != ''">
+				and org_unique_id in (
+					select t.org_unique_id
+					    from org  t
+					    start with t.org_subjectionpid = #{orgId} and t.org_status = '0'
+					         connect by prior t.org_unique_id = t.org_subjectionpid
+				)
+			</if>
+		</where>
+	</select>
+	<delete id="deleteByUniqueId" parameterType="String">
+		delete from org_history where org_unique_id = #{uniqueId}
+	</delete>
+	<!-- 根据条件查询制定的机构个数 -->
+	<select id="getCountByCondtion" resultType="Integer" parameterType="map">
+		select count(1)
+		from org_history
+		<where>
+			<if test="status != null and status != ''">
+				and org_status = #{status}
+			</if>
+			<if test="name != null and name != ''">
+				and org_name = #{name}
+			</if>
+			<if test="uniqueId != null and uniqueId != ''">
+				and org_unique_id = #{uniqueId}
+			</if>
+		</where>
+	</select>
+	
+	<insert id="insertOrgHistory" parameterType="net.greatsoft.core.domain.model.system.OrgHistory">
+		<selectKey resultType="java.lang.Long" order="BEFORE" keyProperty="id">  
+			   select seq_org.nextval as id from dual  
+		</selectKey>
+		insert into org_history
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			org_id,
+			<if test="uniqueId != null">ORG_UNIQUE_ID,</if>
+			<if test="regionPid != null">ORG_REGIONPID,</if>
+			<if test="subjectionPid != null">ORG_SUBJECTIONPID,</if>
+			<if test="name != null">ORG_NAME,</if>
+			<if test="createDate != null">ORG_CREATE_DATE,</if>
+			<if test="replyDate != null">ORG_REPLY_DATE,</if>
+			<if test="status != null">ORG_STATUS,</if>
+			<if test="address != null">ORG_ADDRESS,</if>
+			<if test="email != null">ORG_EMAIL,</if>
+			<if test="postalCode != null">ORG_POSTAL_CODE,</if>
+			<if test="telephone != null">ORG_TELEPHONE,</if>
+			<if test="administrativeCode != null">ORG_ADMINISTRATIVE_CODE,</if>
+			<if test="fileType != null">ORG_FILL_TYPE,</if>
+			<if test="fillFactor != null">ORG_FILL_FACTOR,</if>
+			<if test="economicTypeCode != null">ORG_ECONOMIC_TYPE_CODE,</if>
+			<if test="budgetManagementLevel != null">ORG_BUDGET_MANAGEMENT_LEVEL,</if>
+			<if test="category != null">ORG_CATEGORY,</if>
+			<if test="quality != null">ORG_QUALITY,</if>
+			<if test="classManageCode != null">ORG_CLASS_MANAGE_CODE,</if>
+			<if test="hospitalGrade != null">ORG_HOSPITAL_GRADE,</if>
+			<if test="summaryType != null">ORG_SUMMARY_TYPE,</if>
+			<if test="budgetCode != null">ORG_BUDGET_CODE,</if>
+			<if test="ceo != null">ORG_CEO,</if>
+			<if test="cfo != null">ORG_CFO,</if>
+			<if test="financialManager != null">ORG_FINANCIAL_MANAGER,</if>
+			<if test="prepaper != null">ORG_PREPARER,</if>
+			<if test="healthCategory != null">ORG_HEALTH_CATEGORY,</if>
+			<if test="incomingAndOutgoings != null">ORG_INCOMING_AND_OUTGOINGS,</if>
+			<if test="code != null">ORG_CODE,</if>
+			<if test="reserveCode != null">ORG_RESERVE_CODE,</if>
+			<if test="isCancelMedicine != null">ORG_IS_CANCEL_MEDICINE,</if>
+			<if test="isInteGration != null">ORG_IS_INTEGRATION,</if>
+			<if test="isCancel != null">ORG_IS_CANCEL,</if>
+			<if test="updateTime != null">ORG_UPDATE_TIME,</if>
+			<if test="updateUserId != null">ORG_UPDATE_USER_ID,</if>
+			<if test="isWjw != null">ORG_ISWJW,</if>
+			<if test="orgLevel != null">ORG_LEVEL,</if>
+			<if test="administrativeCategory != null">ORG_ADMINISTRATIVE_CATEGORY,</if>
+			<if test="financialAccounting != null">ORG_FINANCIAL_ACCOUNTING,</if>
+		</trim>
+		<trim prefix="values(" suffix=")" suffixOverrides=",">
+			seq_org.currval,
+			<if test="uniqueId != null">#{uniqueId},</if>
+			<if test="regionPid != null">#{regionPid},</if>
+			<if test="subjectionPid != null">#{subjectionPid},</if>
+			<if test="name != null">#{name},</if>
+			<if test="createDate != null">#{createDate},</if>
+			<if test="replyDate != null">#{replyDate},</if>
+			<if test="status != null">#{status},</if>
+			<if test="address != null">#{address},</if>
+			<if test="email != null">#{email},</if>
+			<if test="postalCode != null">#{postalCode},</if>
+			<if test="telephone != null">#{telephone},</if>
+			<if test="administrativeCode != null">#{administrativeCode},</if>
+			<if test="fileType != null">#{fileType},</if>
+			<if test="fillFactor != null">#{fillFactor},</if>
+			<if test="economicTypeCode != null">#{economicTypeCode},</if>
+			<if test="budgetManagementLevel != null">#{budgetManagementLevel},</if>
+			<if test="category != null">#{category},</if>
+			<if test="quality != null">#{quality},</if>
+			<if test="classManageCode != null">#{classManageCode},</if>
+			<if test="hospitalGrade != null">#{hospitalGrade},</if>
+			<if test="summaryType != null">#{summaryType},</if>
+			<if test="budgetCode != null">#{budgetCode},</if>
+			<if test="ceo != null">#{ceo},</if>
+			<if test="cfo != null">#{cfo},</if>
+			<if test="financialManager != null">#{financialManager},</if>
+			<if test="prepaper != null">#{prepaper},</if>
+			<if test="healthCategory != null">#{healthCategory},</if>
+			<if test="incomingAndOutgoings != null">#{incomingAndOutgoings},</if>
+			<if test="code != null">#{code},</if>
+			<if test="reserveCode != null">#{reserveCode},</if>
+			<if test="isCancelMedicine != null">#{isCancelMedicine},</if>
+			<if test="isInteGration != null">#{isInteGration},</if>
+			<if test="isCancel != null">#{isCancel},</if>
+			<if test="updateTime != null">#{updateTime},</if>
+			<if test="updateUserId != null">#{updateUserId},</if>
+			<if test="isWjw != null">#{isWjw},</if>
+			<if test="orgLevel != null">#{orgLevel},</if>
+			<if test="administrativeCategory != null">#{administrativeCategory},</if>
+			<if test="financialAccounting != null">#{financialAccounting},</if>
+		</trim>
+	</insert>
+	<!-- 通过表期,机构id来获取历史记录的机构信息-->
+	<select id="queryHistoryOrg" parameterType="map" resultMap="orgHistoryResultMap">
+		select 
+			<include refid="org_list_Alias"></include>
+			from org_history oh,audit_record t
+			where t.aud_orgid = oh.org_id  
+			and t.aud_perid = #{perId} 
+			and oh.org_unique_id = #{uniqueId}
+	   		and oh.org_status in ('0', '1')
+	</select>
+	
+	
+	<insert id="insertOrgHistoryWithInId" parameterType="net.greatsoft.core.domain.model.system.OrgHistory">
+		insert into org_history
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+			<if test="id != null">ORG_ID,</if>
+			<if test="uniqueId != null">ORG_UNIQUE_ID,</if>
+			<if test="regionPid != null">ORG_REGIONPID,</if>
+			<if test="subjectionPid != null">ORG_SUBJECTIONPID,</if>
+			<if test="name != null">ORG_NAME,</if>
+			<if test="createDate != null">ORG_CREATE_DATE,</if>
+			<if test="replyDate != null">ORG_REPLY_DATE,</if>
+			<if test="status != null">ORG_STATUS,</if>
+			<if test="address != null">ORG_ADDRESS,</if>
+			<if test="email != null">ORG_EMAIL,</if>
+			<if test="postalCode != null">ORG_POSTAL_CODE,</if>
+			<if test="telephone != null">ORG_TELEPHONE,</if>
+			<if test="administrativeCode != null">ORG_ADMINISTRATIVE_CODE,</if>
+			<if test="fileType != null">ORG_FILL_TYPE,</if>
+			<if test="fillFactor != null">ORG_FILL_FACTOR,</if>
+			<if test="economicTypeCode != null">ORG_ECONOMIC_TYPE_CODE,</if>
+			<if test="budgetManagementLevel != null">ORG_BUDGET_MANAGEMENT_LEVEL,</if>
+			<if test="category != null">ORG_CATEGORY,</if>
+			<if test="quality != null">ORG_QUALITY,</if>
+			<if test="classManageCode != null">ORG_CLASS_MANAGE_CODE,</if>
+			<if test="hospitalGrade != null">ORG_HOSPITAL_GRADE,</if>
+			<if test="summaryType != null">ORG_SUMMARY_TYPE,</if>
+			<if test="budgetCode != null">ORG_BUDGET_CODE,</if>
+			<if test="ceo != null">ORG_CEO,</if>
+			<if test="cfo != null">ORG_CFO,</if>
+			<if test="financialManager != null">ORG_FINANCIAL_MANAGER,</if>
+			<if test="prepaper != null">ORG_PREPARER,</if>
+			<if test="healthCategory != null">ORG_HEALTH_CATEGORY,</if>
+			<if test="incomingAndOutgoings != null">ORG_INCOMING_AND_OUTGOINGS,</if>
+			<if test="code != null">ORG_CODE,</if>
+			<if test="reserveCode != null">ORG_RESERVE_CODE,</if>
+			<if test="isCancelMedicine != null">ORG_IS_CANCEL_MEDICINE,</if>
+			<if test="isInteGration != null">ORG_IS_INTEGRATION,</if>
+			<if test="isCancel != null">ORG_IS_CANCEL,</if>
+			<if test="updateTime != null">ORG_UPDATE_TIME,</if>
+			<if test="updateUserId != null">ORG_UPDATE_USER_ID,</if>
+			<if test="isWjw != null">ORG_ISWJW,</if>
+			<if test="orgLevel != null">ORG_LEVEL,</if>
+			<if test="administrativeCategory != null">ORG_ADMINISTRATIVE_CATEGORY,</if>
+			<if test="financialAccounting != null">ORG_FINANCIAL_ACCOUNTING,</if>
+		</trim>
+		<trim prefix="values(" suffix=")" suffixOverrides=",">
+			<if test="id != null">#{id},</if>
+			<if test="uniqueId != null">#{uniqueId},</if>
+			<if test="regionPid != null">#{regionPid},</if>
+			<if test="subjectionPid != null">#{subjectionPid},</if>
+			<if test="name != null">#{name},</if>
+			<if test="createDate != null">#{createDate},</if>
+			<if test="replyDate != null">#{replyDate},</if>
+			<if test="status != null">#{status},</if>
+			<if test="address != null">#{address},</if>
+			<if test="email != null">#{email},</if>
+			<if test="postalCode != null">#{postalCode},</if>
+			<if test="telephone != null">#{telephone},</if>
+			<if test="administrativeCode != null">#{administrativeCode},</if>
+			<if test="fileType != null">#{fileType},</if>
+			<if test="fillFactor != null">#{fillFactor},</if>
+			<if test="economicTypeCode != null">#{economicTypeCode},</if>
+			<if test="budgetManagementLevel != null">#{budgetManagementLevel},</if>
+			<if test="category != null">#{category},</if>
+			<if test="quality != null">#{quality},</if>
+			<if test="classManageCode != null">#{classManageCode},</if>
+			<if test="hospitalGrade != null">#{hospitalGrade},</if>
+			<if test="summaryType != null">#{summaryType},</if>
+			<if test="budgetCode != null">#{budgetCode},</if>
+			<if test="ceo != null">#{ceo},</if>
+			<if test="cfo != null">#{cfo},</if>
+			<if test="financialManager != null">#{financialManager},</if>
+			<if test="prepaper != null">#{prepaper},</if>
+			<if test="healthCategory != null">#{healthCategory},</if>
+			<if test="incomingAndOutgoings != null">#{incomingAndOutgoings},</if>
+			<if test="code != null">#{code},</if>
+			<if test="reserveCode != null">#{reserveCode},</if>
+			<if test="isCancelMedicine != null">#{isCancelMedicine},</if>
+			<if test="isInteGration != null">#{isInteGration},</if>
+			<if test="isCancel != null">#{isCancel},</if>
+			<if test="updateTime != null">#{updateTime},</if>
+			<if test="updateUserId != null">#{updateUserId},</if>
+			<if test="isWjw != null">#{isWjw},</if>
+			<if test="orgLevel != null">#{orgLevel},</if>
+			<if test="administrativeCategory != null">#{administrativeCategory},</if>
+			<if test="financialAccounting != null">#{financialAccounting},</if>
+		</trim>
+	</insert>
+</mapper>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.FileAdditionalMapper">
+	<delete id="deleteFileAdditionalByTaskId" parameterType="String">
+		delete from file_additional where file_taskid = #{taskId}
+	</delete>
+	<!-- 查询机构批复的上传的文件列表 -->
+	<select id="getUploadFileList" resultType="net.greatsoft.core.domain.model.task.FileAdditional" parameterType="map">
+		select 
+			file_id as fileId,
+			file_taskid as taskId,
+			file_name as fileName,
+			file_url as fileUrl,
+			file_createdate as createDate,
+			file_orgid as orgId,
+			file_status as fileStatus,
+			file_uuid as uuid
+			from  file_additional t
+			where 
+				t.file_taskid is null
+				and t.file_orgid in (
+					select o.org_id from org_history o where o.org_unique_id = #{uniqueId} and o.org_status in ('10','9')
+				)
+			
+	</select>
+</mapper>

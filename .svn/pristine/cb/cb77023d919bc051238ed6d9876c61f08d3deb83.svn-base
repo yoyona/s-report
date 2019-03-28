@@ -1,0 +1,400 @@
+package net.greatsoft.core.web.login;
+
+import java.awt.Color;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.apache.commons.codec.EncoderException;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import com.alibaba.fastjson.JSONObject;
+
+import cn.apiclub.captcha.Captcha;
+import cn.apiclub.captcha.backgrounds.GradiatedBackgroundProducer;
+import cn.apiclub.captcha.gimpy.FishEyeGimpyRenderer;
+import cn.apiclub.captcha.servlet.CaptchaServletUtil;
+import cn.apiclub.captcha.text.producer.NumbersAnswerProducer;
+
+import net.greatsoft.application.common.domain.util.ObjectClone;
+import net.greatsoft.application.common.domain.util.YesNoUtils;
+import net.greatsoft.core.domain.mapper.TaskMapper;
+import net.greatsoft.core.domain.mapper.TaskUserMapper;
+import net.greatsoft.core.domain.model.system.Operation;
+import net.greatsoft.core.domain.model.system.Org;
+import net.greatsoft.core.domain.model.system.PermissionResource;
+import net.greatsoft.core.domain.model.system.Role;
+import net.greatsoft.core.domain.model.system.User;
+import net.greatsoft.core.domain.model.task.AuditRecord;
+import net.greatsoft.core.domain.model.task.Period;
+import net.greatsoft.core.domain.model.task.Task;
+import net.greatsoft.core.domain.model.task.TaskScope;
+import net.greatsoft.core.domain.model.task.TaskUser;
+import net.greatsoft.core.dto.system.UserAgentDto;
+import net.greatsoft.core.dto.system.UserDto;
+import net.greatsoft.core.repository.redis.CacheRedisDao;
+import net.greatsoft.core.repository.system.UserRepository;
+import net.greatsoft.core.service.notice.NoticeService;
+import net.greatsoft.core.service.redis.CacheUsersService;
+import net.greatsoft.core.service.system.OrgService;
+import net.greatsoft.core.service.system.UserService;
+import net.greatsoft.core.service.task.TaskExecuteService;
+import net.greatsoft.core.util.CommonUtils;
+import net.greatsoft.core.util.SystemSettings;
+import net.greatsoft.core.util.constant.ExecuteConstant;
+import net.greatsoft.core.web.BaseController;
+import net.greatsoft.core.web.dto.ResultDto;
+
+@RestController
+@RequestMapping("/login")
+public class LoginController extends BaseController {
+
+	private static Logger logger = Logger.getLogger(LoginController.class);
+
+	@Autowired
+	private UserService userService;
+
+	@Autowired
+	private OrgService orgService;
+
+	@Autowired
+	private UserRepository userRepository;
+
+	@Resource
+	private CacheRedisDao cacheRedisDao;
+
+	@Autowired
+	private SystemSettings systemSettings;
+
+	@Autowired
+	private CacheUsersService cacheUsersService;
+
+	@Autowired
+	private TaskExecuteService taskExecuteService;
+
+	@Autowired
+	private TaskUserMapper taskUserMapper;
+
+	@Autowired
+	private NoticeService noticeService;
+
+	@Autowired
+	private TaskMapper taskMapper;
+	
+	
+	//使用开放平台用户网页登录入口
+	@RequestMapping(value="/sign",method = RequestMethod.GET)
+	public void login(HttpServletRequest request,HttpServletResponse response) throws IOException{
+		response.sendRedirect(systemSettings.getIndexUrl());
+	}
+	
+	//开放平台注册地址
+	@RequestMapping(value = "/index", method = RequestMethod.GET)
+	public void getOauthToken(HttpServletRequest request,HttpServletResponse response) throws Exception {
+
+		String code = request.getParameter("code");
+		if (null == code) {
+			//重定向到开放平台的登录地址:/authorize?xxx=xxx
+			response.sendRedirect(systemSettings.getIndexUrl());
+		}else{
+			System.out.println("code值为：" + code);
+			HttpHeaders headers = new HttpHeaders();
+			RestTemplate template = new RestTemplate();
+			headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);//
+			Base64 base64 = new Base64();
+			String client = "testcw:1qaz";
+			headers.set("Authorization", "basic " + base64.encodeToString(client.getBytes("UTF-8")));
+			HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<MultiValueMap<String, Object>>(
+					null, headers);
+			ResponseEntity<String> responseEntity = template.exchange(systemSettings.getGetToken()+"&code="+code,
+					HttpMethod.POST, requestEntity, String.class);
+			String result = responseEntity.getBody();
+			Map<String, Object> tokenData = JSONObject.parseObject(result, Map.class);
+			
+			String token = tokenData.get("access_token").toString();
+			System.out.println("token:"+token);
+			
+			//
+			/*headers.add("access_token", token);
+			RestTemplate template1 = new RestTemplate();
+			headers.setContentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA);
+			HttpEntity<MultiValueMap<String, Object>> requestEntity1 = new HttpEntity<MultiValueMap<String, Object>>(
+					null, headers);
+			ResponseEntity<String> responseEntity1 = template1.exchange(systemSettings.getOpenplatformSessionUrl(),
+					HttpMethod.GET, requestEntity1, String.class);
+			result = responseEntity1.getBody();
+			Map<String, Object> userData = JSONObject.parseObject(result, Map.class);*/
+			System.out.println("openid >>>>>>>>>>>> " + tokenData.get("open_id"));
+			//通过平台返回open_id查询系统用户信息
+			User users = userRepository.findUsersByEmpId((String)tokenData.get("open_id"));
+			if(users == null){
+				headers = new HttpHeaders();
+				headers.setContentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED);
+				headers.set("Authorization", "Bearer " + token);
+				requestEntity = new HttpEntity<MultiValueMap<String, Object>>(null, headers);
+				responseEntity = template.exchange(systemSettings.getUsersUrl(),HttpMethod.GET, requestEntity, String.class);
+				result = responseEntity.getBody();
+				Map<String, Object> userData = JSONObject.parseObject(result, Map.class);
+				Map<String, Object> userInfo = (Map<String, Object>)userData.get("data");
+				if(200 == (Integer)userData.get("code")){
+					users = new User();
+					String orgId = (String)userInfo.get("organization_id");
+					Org org = orgService.getOrgById(orgId);
+					if(org == null){
+						throw new Exception("用户所属机构尚未同步，请先同步机构信息");
+					}
+					users.setName(userInfo.get("uid").toString());
+					users.setRealName((String)userInfo.get("name"));
+					users.setAdminOrganizationId((String)userInfo.get("organization_id"));
+					users.setPassword("9711d33bdf119a4e85b2b64d5df9abdc");
+					users.setPasswordSalt("123456");
+					users.setType(9);
+		            users.setIsValid(1);
+		            users.setIsCancel(0);
+		            users.setEmpId((String)tokenData.get("open_id"));
+		            
+		            Set roles = new HashSet();
+					Role role = new Role();
+					if("01".equals(org.getFileType())){
+						//暂时写死，
+						if("1".equals(org.getBudgetManagementLevel())){
+							role.setId("5");
+						}else if("2".equals(org.getBudgetManagementLevel())){
+							role.setId("1226a527-e6f0-42cf-9f95-3642ed913d98");//省级
+						}else{
+							role.setId("85a928a5-fd15-4161-93a0-0a8821edce78");//市县
+						}
+					}else{
+						role.setId("3");//基层填报角色
+					}
+					roles.add(role);
+					users.setRoles(roles);
+					
+					users = userRepository.save(users);
+					//01主管机构用户为主管填报角色，其他为基层填报角色
+					//Org org = orgService.getOrgById(users.getAdminOrganizationId());
+					
+					//插入用户任务范围
+					List<TaskUser> list = new ArrayList();
+					List<Map<String,Object>> tasks = taskMapper.queryTaskList();
+					if(tasks.size() > 0){
+						String taskId = null;
+						TaskUser tu = null;
+						for (int i = 0; i < tasks.size(); i++) {
+							tu = new TaskUser();
+							taskId = (String) tasks.get(i).get("TASK_ID");
+							tu.setTaskId(taskId);
+							tu.setUserId(users.getId());
+							list.add(tu);
+						}
+						//插入用户任务关系表
+						taskUserMapper.insertTaskUserBatch(list);
+					}
+				}
+			}
+			users.setToken(token);
+			UserDto user = new UserDto();
+			ObjectClone.copy(user, users);
+			cacheUsersService.addOrUpdate(users.getToken(),user);
+			
+			response.sendRedirect(systemSettings.getRedirectUrl() + "?access_token=" + token);
+		}
+	}
+
+	/**
+	 * 用户登录
+	 **/
+	@Operation(type = "登录", name = "登录", description = "登录")
+	@RequestMapping(value = "/login", method = RequestMethod.POST)
+	public ResultDto login(@RequestBody Map<String, Object> params,HttpServletRequest request) {
+		logger.info("用户登录：------------------------");
+		System.out.println("用户登录》》》》》》》》》》》》》》》》》》");
+		String username = (String) params.get("name");
+		String password = (String) params.get("password");
+		String captcha = (String) params.get("captcha");
+		String encrypt = (String) params.get("encrypt");
+		Integer isAgent = params.get("isAgent") != null ? (Integer) params.get("isAgent") : null;
+		String captchaAnswer = (String) cacheRedisDao.get(getIpAddress(request));//(String) session.getAttribute("Captcha-Answer");
+		// 校验验证码
+		if (StringUtils.isBlank(captcha) || !captcha.equals(captchaAnswer)) {
+			return fail("验证码输入错误", null);
+		}
+		password = CommonUtils.encrypt(encrypt);
+		User user = userService.login(username, password, isAgent);
+		if (user == null) {
+			return fail("用户名或密码错误", user);
+		}
+		if (YesNoUtils.isNotYes(user.getIsValid())) {
+			return fail("该用户已停用", user);
+		}
+		User users = setCacheUsers(user);
+		request.getSession().setAttribute("User", users);
+		setCurrentUser(request.getSession(), user);
+		return success(users);
+	}
+
+	/**
+	 * 通过用户id、登录类型获取用户信息（网页登录方式使用）
+	 */
+	@RequestMapping(value = "/findLoginInfo", method = RequestMethod.GET)
+	public ResultDto findLoginInfo(HttpServletRequest request,@RequestParam String userId,@RequestParam String roleType) {
+		User currentUsers = userService.findUsersByUserId(userId);
+		// 此处获取机构的信息通过唯一id获取,因为用户的机构已然修改为唯一id
+		// Org org = orgService.getOrgByUniqueId(currentUsers.getAdminOrganizationId());
+		Org org = currentUsers.getOrg();
+		PermissionResource menu = userService.findLoginInfo(currentUsers.getId(),roleType);
+		if(menu == null){
+			return new ResultDto(ResultDto.CODE_FAIL, "该用户无此权限", null);
+		}
+		/*List<Org> list = userService.findUserAgentList(userId);
+		list.add(org);*/
+		// 查询用户通知公告个数
+		Integer count = noticeService.findUserNoticeRecordCount(userId);
+		//查询登录用户任务列表
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("userId", userId);
+		List<Task> taskList = taskExecuteService.findLoginTask(param);
+		Map<String, Object> result = new HashMap<>();
+//		result.put("agentOrgs", list);
+		result.put("userInfo", currentUsers);
+		result.put("org", org);
+		result.put("menus", menu.getChildren());
+		result.put("taskList", taskList);
+		result.put("noticeCount", count);
+		return new ResultDto(ResultDto.CODE_SUCCESS, "", result);
+	}
+	
+	/**
+	 * 通过用户id、登录类型获取用户信息（开放平台登录方式使用）
+	 */
+	@RequestMapping(value = "/findLoginInfoByToken", method = RequestMethod.GET)
+	public ResultDto findLoginInfoByToken(HttpServletRequest request,@RequestParam String token,@RequestParam String roleType) {
+		UserDto user = getCachedUserDto(request);
+		User currentUsers = userService.findUsersByUserId(user.getId());
+		// 此处获取机构的信息通过唯一id获取,因为用户的机构已然修改为唯一id
+		Org org = orgService.getOrgByUniqueId(currentUsers.getAdminOrganizationId());
+		PermissionResource menu = userService.findLoginInfo(currentUsers.getId(),roleType);
+		if(menu == null){
+			return new ResultDto(ResultDto.CODE_FAIL, "该用户无此权限", null);
+		}
+		List<Org> list = userService.findUserAgentList(currentUsers.getId());
+		list.add(org);
+		// 查询用户通知公告个数
+		Integer count = noticeService.findUserNoticeRecordCount(currentUsers.getId());
+		//查询登录用户任务列表
+		Map<String,Object> param = new HashMap<String,Object>();
+		param.put("userId", currentUsers.getId());
+		List<Task> taskList = taskExecuteService.findLoginTask(param);
+		Map<String, Object> result = new HashMap<>();
+		result.put("agentOrgs", list);
+		result.put("userInfo", currentUsers);
+		result.put("org", org);
+		result.put("menus", menu.getChildren());
+		result.put("taskList", taskList);
+		result.put("noticeCount", count);
+		return new ResultDto(ResultDto.CODE_SUCCESS, "", result);
+	}
+	
+	/**
+	 * 用户退出登录
+	 * 退出时记录业务入口登录用户操作的任务id和表期id
+	 */
+	@Operation(type = "退出", name = "退出", description = "系统退出")
+	@PostMapping(value = "/loginOut")
+	public ResultDto loginOut(@RequestBody Map<String, String> params,HttpServletRequest request) {
+		delCacheUsersDto(request);
+		if(params != null && params.size() > 0 ){
+			String userId = params.get("userId");
+			String taskId = params.get("taskId");
+			String perId = params.get("periodId");
+			String taskOrgId = params.get("taskOrgId");
+			User user = userRepository.getOne(userId);
+			user.setTaskId(taskId);
+			user.setPerId(perId);
+			user.setTaskOrgId(taskOrgId);
+			userRepository.save(user);
+		}
+		return new ResultDto(ResultDto.CODE_SUCCESS, "", null);
+	}
+
+	/**
+	 * 根据所属机构查询用户
+	 * @param orgId
+	 * @param roleType
+	 * @return
+	 */
+	@GetMapping(value = "/user")
+	public ResultDto queryUserByOrgId(@RequestParam String orgId,@RequestParam Integer roleType){
+		User user = userRepository.findUserByOrgId(orgId, roleType);
+		if(user == null){
+			return new ResultDto(ResultDto.CODE_FAIL, "该机构无管理员用户", null);
+		}else{
+			return new ResultDto(ResultDto.CODE_SUCCESS, "", user.getName());
+		}
+	}
+
+	/**
+	 * 获取验证码 缓存到redis里面
+	 * @param request
+	 * @return
+	 */
+	@RequestMapping(value = "/getCaptcha", method = RequestMethod.GET)
+	public ResultDto getCaptcha(HttpServletRequest request) {
+		// 生成验证码
+		Captcha captcha = new Captcha.Builder(200, 60)
+				.addBackground(new GradiatedBackgroundProducer(Color.YELLOW,
+						Color.GREEN))
+				.gimp(new FishEyeGimpyRenderer(Color.GREEN, Color.YELLOW))
+				.addText(new NumbersAnswerProducer(4)).build();
+
+		// 把这个验证码放入缓存
+		cacheRedisDao.set(getIpAddress(request), captcha.getAnswer());
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		CaptchaServletUtil.writeImage(baos, captcha.getImage());
+		String base64 = Base64.encodeBase64String(baos.toByteArray());
+		return success(base64);
+	}
+	
+	private String getIpAddress(HttpServletRequest request) {
+		String ip = request.getHeader("x-forwarded-for");
+		if (StringUtils.isBlank(ip) || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getHeader("Proxy-Client-IP");
+		}
+		if (StringUtils.isBlank(ip) || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getHeader("WL-Proxy-Client-IP");
+		}
+		if (StringUtils.isBlank(ip) || "unknown".equalsIgnoreCase(ip)) {
+			ip = request.getRemoteAddr();
+		}
+		return ip;
+	}
+}

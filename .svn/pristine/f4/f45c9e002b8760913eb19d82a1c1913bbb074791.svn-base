@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="net.greatsoft.core.domain.mapper.QueryParamIndRelMapper">
+    <insert id="insertQueryParamIndRel" parameterType="java.util.List">
+		insert all 
+	    <foreach collection="list" item="item" index="index" >
+	     into QUERY_PARAM_IND_REL
+	    	(REL_PARID,REL_INDID)
+	    	values(
+   			#{item.parId,jdbcType=VARCHAR},
+   			#{item.indId,jdbcType=VARCHAR}
+	    	)		
+	    </foreach>
+	    select * from dual 
+	</insert>
+	<delete id="deleteQueryParamIndRelByParId" parameterType="String">
+	    delete from QUERY_PARAM_IND_REL t where t.REL_PARID = #{parId}
+	</delete>
+	
+	<select id="getQueryParamIndRelByParId" parameterType="map" resultType="map">
+	    select rel_parid,rel_indid,s.sta_name,s.sta_column,s.sta_rowname,s.sta_table,s.sta_tablename
+	    from QUERY_PARAM_IND_REL t
+	    left join standard_indice_analysis s on t.rel_indid = s.sta_id
+	    where REL_PARID = #{parId}
+	    order by sta_tablename,rel_indid
+	</select>
+</mapper>
